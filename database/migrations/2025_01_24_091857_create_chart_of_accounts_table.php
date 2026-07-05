@@ -22,7 +22,6 @@ return new class extends Migration
             $table->unsignedBigInteger('shoa_id');
 
             $table->string('name');
-            $table->string('trn')->nullable();
 
             // Validated against COAController::ACCOUNT_TYPES on every write.
             // Valid values: customer | vendor | cash | bank | inventory |

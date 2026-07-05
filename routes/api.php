@@ -9,5 +9,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('me', [AuthApiController::class, 'me']);
     Route::post('logout', [AuthApiController::class, 'logout']);
     Route::post('change-password', [AuthApiController::class, 'changePassword']);
-    // ...your other protected API routes
+
+    // Example for module APIs — guard each with its permission:
+    Route::get('chart-of-accounts', [ChartOfAccountApiController::class, 'index'])->middleware('check.permission:coa.view');
 });
+

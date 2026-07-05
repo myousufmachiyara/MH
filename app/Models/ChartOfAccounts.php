@@ -25,7 +25,6 @@ class ChartOfAccounts extends Model
         'remarks',
         'address',
         'contact_no',
-        'trn',
         'created_by',
         'updated_by',
     ];
