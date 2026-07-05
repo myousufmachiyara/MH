@@ -1,8 +1,10 @@
-<?php
+use App\Http\Controllers\Api\AuthApiController;
 
-use App\Http\Controllers\Api\AccountMappingApiController;
+Route::post('login', [AuthApiController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('account-mappings', [AccountMappingApiController::class, 'index']);
-    Route::put('account-mappings', [AccountMappingApiController::class, 'update']);
+    Route::get('me', [AuthApiController::class, 'me']);
+    Route::post('logout', [AuthApiController::class, 'logout']);
+    Route::post('change-password', [AuthApiController::class, 'changePassword']);
+    // ...your other protected API routes
 });
