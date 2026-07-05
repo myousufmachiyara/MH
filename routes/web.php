@@ -82,13 +82,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('change-my-password',  [UserController::class, 'changeMyPassword'])->name('changeMyPassword');
     });
 
+    Route::get('accounts/mapping', [AccountMappingController::class, 'index'])->name('account-mappings.index');
+    Route::put('accounts/mapping', [AccountMappingController::class, 'update'])->name('account-mappings.update');
     // ────────────────────────────────────────────────────────────────────
     // PRODUCT HELPERS  (AJAX endpoints used by select2 / dropdowns)
     // ────────────────────────────────────────────────────────────────────
 
     Route::prefix('helpers')->name('helpers.')->group(function () {
-        Route::get('accounts/mapping', [AccountMappingController::class, 'index'])->name('account-mappings.index');
-        Route::put('accounts/mapping', [AccountMappingController::class, 'update'])->name('account-mappings.update');
 
         // Products
         Route::get('products/details',                   [ProductController::class, 'details'])->name('product.details');
