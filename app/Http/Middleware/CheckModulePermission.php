@@ -16,20 +16,6 @@ use Illuminate\Support\Facades\Log;
  *   ->middleware('check.permission:projects.index')
  *   ->middleware('check.permission:vouchers.create')
  *   ->middleware('check.permission:reports.inventory')
- *
- * WHY we always pass the full string — not just the module:
- * The original CheckModulePermission tried to infer the action from
- * the route method name (store→create, update→edit, destroy→delete).
- * This breaks for:
- *   - Custom actions (dispatch, receive, status, print)
- *   - AJAX helper routes that don't follow CRUD naming
- *   - Routes with the same method name but different permissions
- * Passing the full permission string is explicit, readable, and safe.
- *
- * FIX: returns JSON 403 when the request expects JSON.
- * Without this, fetch() AJAX calls that fail permission checks receive
- * an HTML redirect page → JSON.parse() throws → confusing "network error"
- * in the catch block instead of a clear "Access denied" message.
  */
 class CheckModulePermission
 {
