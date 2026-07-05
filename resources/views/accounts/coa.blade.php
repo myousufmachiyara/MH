@@ -62,12 +62,12 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h2 class="card-title">All Accounts</h2>
                         @can('coa.create')
-                            <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
-                                <i class="fas fa-plus"></i> Add Account
-                            </button>
                             <a href="{{ route('account-mappings.index') }}" class="btn btn-outline-primary">
                                 <i class="fas fa-link me-1"></i> Account Mappings
                             </a>
+                            <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
+                                <i class="fas fa-plus"></i> Add Account
+                            </button>
                         @endcan
                     </div>
                     @if ($errors->has('error'))
