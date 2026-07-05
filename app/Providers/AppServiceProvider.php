@@ -19,5 +19,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Vendor::observe(VendorObserver::class);
         Customer::observe(CustomerObserver::class);
+        Schema::defaultStringLength(191);   // add this line
     }
 }
