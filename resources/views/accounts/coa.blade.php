@@ -65,6 +65,9 @@
                             <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
                                 <i class="fas fa-plus"></i> Add Account
                             </button>
+                            <a href="{{ route('account-mappings.index') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-link me-1"></i> Account Mappings
+                            </a>
                         @endcan
                     </div>
                     @if ($errors->has('error'))

@@ -9,6 +9,7 @@ use App\Http\Controllers\{
     // ── Accounts ────────────────────────────────────────────────────────
     SubHeadOfAccController,
     COAController,
+    AccountMappingController,
 
     // ── User management ─────────────────────────────────────────────────
     UserController,
@@ -86,6 +87,8 @@ Route::middleware(['auth'])->group(function () {
     // ────────────────────────────────────────────────────────────────────
 
     Route::prefix('helpers')->name('helpers.')->group(function () {
+        Route::get('accounts/mapping', [AccountMappingController::class, 'index'])->name('account-mappings.index');
+        Route::put('accounts/mapping', [AccountMappingController::class, 'update'])->name('account-mappings.update');
 
         // Products
         Route::get('products/details',                   [ProductController::class, 'details'])->name('product.details');
