@@ -10,7 +10,8 @@ class AccountMappingController extends Controller
 {
     public function __construct(private AccountMappingService $service)
     {
-        $this->middleware('permission:manage-coa');
+        // use YOUR custom middleware + YOUR permission naming
+        $this->middleware('check.permission:coa.index');
     }
 
     public function index()
