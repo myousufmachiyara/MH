@@ -17,7 +17,7 @@ class AccountMappingController extends Controller
     public function index()
     {
         $mappings = $this->service->all();
-        $accounts = ChartOfAccounts::with('subHead')
+        $accounts = ChartOfAccounts::with('subHeadOfAccount')
             ->orderBy('account_code')
             ->get();
 
