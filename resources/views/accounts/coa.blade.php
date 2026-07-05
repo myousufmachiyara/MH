@@ -59,20 +59,24 @@
                 @endif
 
                 <header class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h2 class="card-title">All Accounts</h2>
+                    <div style="display: flex;justify-content: space-between;">
+                        <h2 class="card-title">All Products</h2>
                         @can('coa.create')
-                            <a href="{{ route('account-mappings.index') }}" class="btn btn-outline-primary">
+                            <div>
+                                <!-- Export button -->
+                                <a href="{{ route('account-mappings.index') }}" class="btn btn-outline-primary">
                                 <i class="fas fa-link me-1"></i> Account Mappings
                             </a>
                             <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
                                 <i class="fas fa-plus"></i> Add Account
                             </button>
+                            </div>
                         @endcan
                     </div>
-                    @if ($errors->has('error'))
+                     @if ($errors->has('error'))
                         <strong class="text-danger">{{ $errors->first('error') }}</strong>
                     @endif
+                   
                 </header>
 
                 <div class="card-body">
