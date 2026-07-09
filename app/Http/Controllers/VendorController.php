@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vendor;
-use App\Models\ChartOfAccounts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -11,52 +10,51 @@ use Illuminate\Validation\Rule;
 
 class VendorController extends Controller
 {
-    // ─────────────────────────────────────────────────────────────────
     public function index()
     {
         $vendors = Vendor::orderBy('name')->get();
         return view('accounts.vendors', compact('vendors'));
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function store(Request $request)
     {
         $request->validate([
-            'name'                  => 'required|string|max:255',
-            'vendor_type'           => ['required', Rule::in(array_keys(Vendor::TYPES))],
-            'phone'                 => 'nullable|string|max:50',
-            'email'                 => 'nullable|email|max:255',
-            'contact_person'        => 'nullable|string|max:255',
-            'address'               => 'nullable|string|max:500',
-            'city'                  => 'nullable|string|max=100',
-            'ntn'                   => 'nullable|string|max:50',
-            'opening_balance'       => 'nullable|numeric|min:0',
-            'opening_balance_type'  => 'nullable|in:debit,credit',
-            'opening_balance_date'  => 'nullable|date',
-            'notes'                 => 'nullable|string|max:1000',
-            'is_active'             => 'nullable|boolean',
+            'name'                 => 'required|string|max:255',
+            'vendor_type'          => ['required', Rule::in(array_keys(Vendor::TYPES))],
+            'phone'                => 'nullable|string|max:50',
+            'email'                => 'nullable|email|max:255',
+            'contact_person'       => 'nullable|string|max:255',
+            'address'              => 'nullable|string|max:500',
+            'city'                 => 'nullable|string|max:100',
+            'ntn'                  => 'nullable|string|max:50',
+            'opening_balance'      => 'nullable|numeric|min:0',
+            'opening_type'         => 'nullable|in:receivable,payable',
+            'opening_balance_date' => 'nullable|date',
+            'notes'                => 'nullable|string|max:1000',
+            'is_active'            => 'nullable|boolean',
         ]);
 
         DB::beginTransaction();
         try {
             $vendor = Vendor::create([
-                'name'                  => $request->name,
-                'vendor_type'           => $request->vendor_type,
-                'phone'                 => $request->phone,
-                'email'                 => $request->email,
-                'contact_person'        => $request->contact_person,
-                'address'               => $request->address,
-                'city'                  => $request->city,
-                'ntn'                   => $request->ntn,
-                'opening_balance'       => $request->opening_balance ?? 0,
-                'opening_balance_type'  => $request->opening_balance_type ?? 'credit',
-                'opening_balance_date'  => $request->opening_balance_date ?? now()->toDateString(),
-                'notes'                 => $request->notes,
-                'is_active'             => $request->boolean('is_active', true),
-                'created_by'            => auth()->id(),
-                'updated_by'            => auth()->id(),
+                'name'                 => $request->name,
+                'vendor_type'          => $request->vendor_type,
+                'phone'                => $request->phone,
+                'email'                => $request->email,
+                'contact_person'       => $request->contact_person,
+                'address'              => $request->address,
+                'city'                 => $request->city,
+                'ntn'                  => $request->ntn,
+                'opening_balance'      => $request->opening_balance ?? 0,
+                'opening_type'         => $request->opening_type ?? 'payable',
+                'opening_balance_date' => $request->opening_balance_date ?? now()->toDateString(),
+                'notes'                => $request->notes,
+                'is_active'            => $request->boolean('is_active', true),
+                'created_by'           => auth()->id(),
+                'updated_by'           => auth()->id(),
             ]);
-            // VendorObserver::created() fires here — creates COA, posts opening balance
+            // No COA/observer side effects — vendors are separate from COA.
+            // opening_balance + opening_type feed the balance formula directly.
 
             DB::commit();
 
@@ -76,8 +74,6 @@ class VendorController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // Returns JSON for edit modal
     public function edit($id)
     {
         try {
@@ -88,23 +84,22 @@ class VendorController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function update(Request $request, $id)
     {
         $request->validate([
-            'name'                  => 'required|string|max:255',
-            'vendor_type'           => ['required', Rule::in(array_keys(Vendor::TYPES))],
-            'phone'                 => 'nullable|string|max:50',
-            'email'                 => 'nullable|email|max:255',
-            'contact_person'        => 'nullable|string|max:255',
-            'address'               => 'nullable|string|max:500',
-            'city'                  => 'nullable|string|max:100',
-            'ntn'                   => 'nullable|string|max:50',
-            'opening_balance'       => 'nullable|numeric|min:0',
-            'opening_balance_type'  => 'nullable|in:debit,credit',
-            'opening_balance_date'  => 'nullable|date',
-            'notes'                 => 'nullable|string|max:1000',
-            'is_active'             => 'nullable|boolean',
+            'name'                 => 'required|string|max:255',
+            'vendor_type'          => ['required', Rule::in(array_keys(Vendor::TYPES))],
+            'phone'                => 'nullable|string|max:50',
+            'email'                => 'nullable|email|max:255',
+            'contact_person'       => 'nullable|string|max:255',
+            'address'              => 'nullable|string|max:500',
+            'city'                 => 'nullable|string|max:100',
+            'ntn'                  => 'nullable|string|max:50',
+            'opening_balance'      => 'nullable|numeric|min:0',
+            'opening_type'         => 'nullable|in:receivable,payable',
+            'opening_balance_date' => 'nullable|date',
+            'notes'                => 'nullable|string|max:1000',
+            'is_active'            => 'nullable|boolean',
         ]);
 
         DB::beginTransaction();
@@ -112,22 +107,21 @@ class VendorController extends Controller
             $vendor = Vendor::findOrFail($id);
 
             $vendor->update([
-                'name'                  => $request->name,
-                'vendor_type'           => $request->vendor_type,
-                'phone'                 => $request->phone,
-                'email'                 => $request->email,
-                'contact_person'        => $request->contact_person,
-                'address'               => $request->address,
-                'city'                  => $request->city,
-                'ntn'                   => $request->ntn,
-                'opening_balance'       => $request->opening_balance ?? $vendor->opening_balance,
-                'opening_balance_type'  => $request->opening_balance_type ?? $vendor->opening_balance_type,
-                'opening_balance_date'  => $request->opening_balance_date ?? $vendor->opening_balance_date,
-                'notes'                 => $request->notes,
-                'is_active'             => $request->boolean('is_active', $vendor->is_active),
-                'updated_by'            => auth()->id(),
+                'name'                 => $request->name,
+                'vendor_type'          => $request->vendor_type,
+                'phone'                => $request->phone,
+                'email'                => $request->email,
+                'contact_person'       => $request->contact_person,
+                'address'              => $request->address,
+                'city'                 => $request->city,
+                'ntn'                  => $request->ntn,
+                'opening_balance'      => $request->opening_balance ?? $vendor->opening_balance,
+                'opening_type'         => $request->opening_type ?? $vendor->opening_type,
+                'opening_balance_date' => $request->opening_balance_date ?? $vendor->opening_balance_date,
+                'notes'                => $request->notes,
+                'is_active'            => $request->boolean('is_active', $vendor->is_active),
+                'updated_by'           => auth()->id(),
             ]);
-            // VendorObserver::updated() fires here — syncs COA name if changed
 
             DB::commit();
 
@@ -148,25 +142,29 @@ class VendorController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function destroy($id)
     {
         DB::beginTransaction();
         try {
             $vendor = Vendor::findOrFail($id);
 
-            // Guard: cannot delete if vendor has purchase invoices
-            $hasInvoices = DB::table('purchase_invoices')
-                ->where('vendor_id', $id)
+            // Guard: cannot delete if vendor has any voucher entries (transaction history)
+            $hasEntries = DB::table('voucher_entries')
+                ->where('party_type', 'vendor')
+                ->where('party_id', $id)
                 ->exists();
 
-            if ($hasInvoices) {
+            // Guard: cannot delete if vendor has purchases or job orders
+            $hasPurchases = DB::table('purchases')->where('vendor_id', $id)->exists();
+            $hasJobOrders = DB::table('job_orders')->where('vendor_id', $id)->exists();
+
+            if ($hasEntries || $hasPurchases || $hasJobOrders) {
                 DB::rollBack();
                 return redirect()->back()
-                    ->with('error', 'Cannot delete "' . $vendor->name . '" — it has purchase invoices. Deactivate instead.');
+                    ->with('error', 'Cannot delete "' . $vendor->name . '" — it has transaction history. Deactivate instead.');
             }
 
-            $vendor->delete(); // VendorObserver::deleted() fires — soft-deletes COA
+            $vendor->delete();
 
             DB::commit();
 
@@ -186,9 +184,7 @@ class VendorController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // AJAX: search vendors for Select2 dropdowns across modules
-    // Route: helpers.vendors.search  GET /helpers/vendors/search?q=...&type=...
+    // AJAX: search vendors for Select2 dropdowns / mobile lookups
     public function search(Request $request)
     {
         try {
@@ -211,34 +207,11 @@ class VendorController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // AJAX: get services a vendor can perform
-    // Route: helpers.vendor.services  GET /helpers/vendors/{vendor}/services
-    public function getServices($vendorId)
-    {
-        try {
-            $vendor   = Vendor::with('services')->findOrFail($vendorId);
-            $services = $vendor->services->map(fn($s) => [
-                'id'    => $s->id,
-                'name'  => $s->name,
-                'rate'  => $s->pivot->rate,
-                'notes' => $s->pivot->notes,
-            ]);
-
-            return response()->json(['success' => true, 'services' => $services]);
-
-        } catch (\Exception $e) {
-            Log::error('[Vendor] getServices failed', ['message' => $e->getMessage()]);
-            return response()->json(['success' => false, 'services' => []], 404);
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // show() — returns JSON (used by other modules to fetch vendor data)
+    // show() — JSON, used by other modules to fetch vendor data
     public function show($id)
     {
         try {
-            $vendor = Vendor::with('coaAccount')->findOrFail($id);
+            $vendor = Vendor::findOrFail($id);
             return response()->json($vendor);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Vendor not found.'], 404);

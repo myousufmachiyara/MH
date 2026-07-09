@@ -9,72 +9,51 @@ class Customer extends Model
 {
     use SoftDeletes;
 
+    protected $table = 'customers';
+
     protected $fillable = [
-        'coa_id',
-        'name',
-        'contact_person',
-        'phone',
-        'email',
-        'address',
-        'city',
-        'ntn',
-        'opening_balance',
-        'opening_balance_type',
-        'opening_balance_date',
-        'credit_limit',
-        'notes',
-        'is_active',
-        'created_by',
-        'updated_by',
+        'name', 'contact_person', 'phone', 'email', 'address', 'city',
+        'ntn', 'opening_balance', 'opening_type', 'opening_balance_date',
+        'credit_limit', 'notes', 'is_active',
+        'created_by', 'updated_by',
     ];
 
     protected $casts = [
-        'opening_balance' => 'decimal:2',
-        'credit_limit'    => 'decimal:2',
-        'is_active'       => 'boolean',
+        'opening_balance'      => 'decimal:2',
+        'credit_limit'         => 'decimal:2',
         'opening_balance_date' => 'date',
+        'is_active'             => 'boolean',
     ];
 
-    // ── Relationships ────────────────────────────────────────────────
-
-    public function coaAccount()
+    public function getOpeningBalanceSignedAttribute(): float
     {
-        return $this->belongsTo(ChartOfAccounts::class, 'coa_id');
+        $amt = (float) $this->opening_balance;
+        return $this->opening_type === 'payable' ? -abs($amt) : abs($amt);
     }
 
-    public function createdBy()
+    public function voucherEntries()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->hasMany(VoucherEntry::class, 'party_id')->where('party_type', 'customer');
     }
 
-    public function updatedBy()
+    public function getBalanceAttribute(): float
     {
-        return $this->belongsTo(User::class, 'updated_by');
+        $net = VoucherEntry::where('party_type', 'customer')
+            ->where('party_id', $this->id)
+            ->selectRaw('COALESCE(SUM(debit),0) - COALESCE(SUM(credit),0) as net')
+            ->value('net');
+
+        return $this->opening_balance_signed + (float) $net;
     }
 
-    public function projects()
-    {
-        return $this->hasMany(Project::class);
-    }
-
-    // ── Scopes ──────────────────────────────────────────────────────
-
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
-
-    // ── AJAX search helper ───────────────────────────────────────────
+    public function scopeActive($q) { return $q->where('is_active', true); }
 
     public function toLookup(): array
     {
         return [
-            'id'             => $this->id,
-            'text'           => $this->name,
-            'contact_person' => $this->contact_person,
-            'phone'          => $this->phone,
-            'coa_id'         => $this->coa_id,
-            'credit_limit'   => $this->credit_limit,
+            'id'      => $this->id,
+            'name'    => $this->name,
+            'balance' => $this->balance,
         ];
     }
 }

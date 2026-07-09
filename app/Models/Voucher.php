@@ -9,35 +9,22 @@ class Voucher extends Model
 {
     use SoftDeletes;
 
+    protected $table = 'vouchers';
+
     protected $fillable = [
-        'voucher_type', // payment, receipt, journal, or any custom type
-        'date',
-        'ac_dr_sid',
-        'ac_cr_sid',
-        'amount',
-        'remarks',
-        'reference',
-        'description',
-        'attachments',
+        'voucher_no', 'type', 'voucher_date', 'narration',
+        'reference_type', 'reference_id',
+        'created_by', 'updated_by',
     ];
 
     protected $casts = [
-        'attachments' => 'array',
+        'voucher_date' => 'date',
     ];
 
-    public function debitAccount()
+    public function entries()
     {
-        return $this->belongsTo(ChartOfAccounts::class, 'ac_dr_sid', 'id');
+        return $this->hasMany(VoucherEntry::class, 'voucher_id');
     }
 
-    public function creditAccount()
-    {
-        return $this->belongsTo(ChartOfAccounts::class, 'ac_cr_sid', 'id');
-    }
-
-    public function scopeType($query, $type)
-    {
-        return $query->where('voucher_type', $type);
-    }
-
+    public function createdBy() { return $this->belongsTo(User::class, 'created_by'); }
 }

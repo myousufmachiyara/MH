@@ -9,96 +9,61 @@ class Vendor extends Model
 {
     use SoftDeletes;
 
+    protected $table = 'vendors';
+
+    public const TYPES = [
+        'spinning_mill'   => 'Spinning Mill',
+        'weaving_mill'    => 'Weaving Mill',
+        'processing_mill' => 'Processing Mill',
+        'packager'        => 'Packager',
+        'courier'         => 'Courier',
+        'other'           => 'Other',
+    ];
+
     protected $fillable = [
-        'coa_id',
-        'name',
-        'vendor_type',
-        'phone',
-        'email',
-        'contact_person',
-        'address',
-        'city',
-        'ntn',
-        'opening_balance',
-        'opening_balance_type',
-        'opening_balance_date',
-        'notes',
-        'is_active',
-        'created_by',
-        'updated_by',
+        'name', 'vendor_type', 'phone', 'email', 'contact_person',
+        'address', 'city', 'ntn', 'opening_balance', 'opening_type',
+        'opening_balance_date', 'notes', 'is_active',
+        'created_by', 'updated_by',
     ];
 
     protected $casts = [
-        'opening_balance' => 'decimal:2',
-        'is_active'       => 'boolean',
+        'opening_balance'      => 'decimal:2',
         'opening_balance_date' => 'date',
+        'is_active'             => 'boolean',
     ];
 
-    // ── Vendor type labels ───────────────────────────────────────────
-
-    public const TYPES = [
-        'spinning_mill'    => 'Spinning Mill',
-        'weaving_mill'     => 'Weaving Mill',
-        'processing_mill'  => 'Processing Mill',
-        'packager'         => 'Packager',
-        'courier'          => 'Courier',
-        'other'            => 'Other',
-    ];
-
-    public function getTypeLabel(): string
+    public function getOpeningBalanceSignedAttribute(): float
     {
-        return self::TYPES[$this->vendor_type] ?? ucfirst($this->vendor_type);
+        $amt = (float) $this->opening_balance;
+        return $this->opening_type === 'payable' ? -abs($amt) : abs($amt);
     }
 
-    // ── Relationships ────────────────────────────────────────────────
-
-    public function coaAccount()
+    public function voucherEntries()
     {
-        return $this->belongsTo(ChartOfAccounts::class, 'coa_id');
+        return $this->hasMany(VoucherEntry::class, 'party_id')->where('party_type', 'vendor');
     }
 
-    public function createdBy()
+    public function getBalanceAttribute(): float
     {
-        return $this->belongsTo(User::class, 'created_by');
+        $net = VoucherEntry::where('party_type', 'vendor')
+            ->where('party_id', $this->id)
+            ->selectRaw('COALESCE(SUM(debit),0) - COALESCE(SUM(credit),0) as net')
+            ->value('net');
+
+        return $this->opening_balance_signed + (float) $net;
     }
 
-    public function updatedBy()
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
+    public function scopeActive($q) { return $q->where('is_active', true); }
 
-    // Services this vendor can perform (pivot — built in Services module)
-    public function services()
-    {
-        return $this->belongsToMany(Service::class, 'service_vendor')
-                    ->using(ServiceVendor::class)
-                    ->withPivot('id', 'rate', 'currency', 'notes')
-                    ->withTimestamps();
-    }
-
-    // ── Scopes ──────────────────────────────────────────────────────
-
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
-
-    public function scopeOfType($query, string $type)
-    {
-        return $query->where('vendor_type', $type);
-    }
-
-    // ── AJAX search helper ───────────────────────────────────────────
-    // Used by helpers.vendors.search route for Select2 dropdowns
-
+    // Compact shape for Select2 / mobile dropdowns
     public function toLookup(): array
     {
         return [
-            'id'       => $this->id,
-            'text'     => $this->name,
-            'type'     => $this->getTypeLabel(),
-            'phone'    => $this->phone,
-            'coa_id'   => $this->coa_id,
+            'id'          => $this->id,
+            'name'        => $this->name,
+            'vendor_type' => $this->vendor_type,
+            'balance'     => $this->balance,
         ];
     }
 }

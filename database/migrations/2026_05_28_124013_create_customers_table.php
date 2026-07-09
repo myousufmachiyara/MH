@@ -11,9 +11,6 @@ return new class extends Migration
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
 
-            // FK to chart_of_accounts — auto-created by CustomerObserver on created
-            $table->unsignedBigInteger('coa_id')->nullable();
-
             // ── Core fields ────────────────────────────────────────
             $table->string('name');                              // required
 
@@ -25,9 +22,13 @@ return new class extends Migration
             $table->string('city')->nullable();
 
             // ── Financial ──────────────────────────────────────────
+            // Parties are separated from Chart of Accounts. A customer's
+            // balance is computed from voucher_entries (party_type='customer',
+            // party_id=this.id) against the Accounts Receivable control account.
+            // No coa_id — customers are not COA accounts.
             $table->string('ntn')->nullable();
             $table->decimal('opening_balance', 15, 2)->default(0);
-            $table->enum('opening_balance_type', ['debit', 'credit'])->default('debit');
+            $table->string('opening_type', 10)->default('receivable'); // 'receivable' | 'payable'
             $table->date('opening_balance_date')->nullable();
             $table->decimal('credit_limit', 15, 2)->default(0);
 
@@ -41,10 +42,6 @@ return new class extends Migration
             $table->timestamps();
 
             // ── Foreign keys ───────────────────────────────────────
-            $table->foreign('coa_id')
-                  ->references('id')->on('chart_of_accounts')
-                  ->onDelete('set null');
-
             $table->foreign('created_by')
                   ->references('id')->on('users')
                   ->onDelete('set null');

@@ -11,9 +11,6 @@ return new class extends Migration
         Schema::create('vendors', function (Blueprint $table) {
             $table->id();
 
-            // FK to chart_of_accounts — auto-created by VendorObserver on created
-            $table->unsignedBigInteger('coa_id')->nullable();
-
             // ── Core fields ────────────────────────────────────────
             $table->string('name');                              // required
             $table->string('vendor_type')->default('other');     // spinning_mill | weaving_mill | processing_mill | packager | courier | other
@@ -26,9 +23,13 @@ return new class extends Migration
             $table->string('city')->nullable();
 
             // ── Financial ──────────────────────────────────────────
+            // Parties are separated from Chart of Accounts. A vendor's
+            // balance is computed from voucher_entries (party_type='vendor',
+            // party_id=this.id) against the Accounts Payable control account.
+            // No coa_id — vendors are not COA accounts.
             $table->string('ntn')->nullable();                   // National Tax Number
             $table->decimal('opening_balance', 15, 2)->default(0);
-            $table->enum('opening_balance_type', ['debit', 'credit'])->default('credit');
+            $table->string('opening_type', 10)->default('payable'); // 'receivable' | 'payable'
             $table->date('opening_balance_date')->nullable();
 
             // ── Meta ───────────────────────────────────────────────
@@ -41,10 +42,6 @@ return new class extends Migration
             $table->timestamps();
 
             // ── Foreign keys ───────────────────────────────────────
-            $table->foreign('coa_id')
-                  ->references('id')->on('chart_of_accounts')
-                  ->onDelete('set null');
-
             $table->foreign('created_by')
                   ->references('id')->on('users')
                   ->onDelete('set null');
