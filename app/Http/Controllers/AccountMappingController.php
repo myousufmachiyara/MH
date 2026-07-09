@@ -10,8 +10,10 @@ class AccountMappingController extends Controller
 {
     public function __construct(private AccountMappingService $service)
     {
-        // use YOUR custom middleware + YOUR permission naming
-        $this->middleware('check.permission:coa.index');
+        // Viewing the mapping screen requires coa.view
+        $this->middleware('check.permission:coa.view')->only('index');
+        // Saving mappings requires coa.edit (more sensitive — drives the voucher engine)
+        $this->middleware('check.permission:coa.edit')->only('update');
     }
 
     public function index()
@@ -21,7 +23,6 @@ class AccountMappingController extends Controller
             ->orderBy('account_code')
             ->get();
 
-        // your view lives at resources/views/accounts/mapping.blade.php
         return view('accounts.mapping', compact('mappings', 'accounts'));
     }
 

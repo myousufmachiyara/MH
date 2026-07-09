@@ -21,19 +21,13 @@
             <nav id="menu" class="nav-main" role="navigation">
                 <ul class="nav nav-main">
 
-                    {{-- ── Dashboard ─────────────────────────────── --}}
+                    {{-- ── Dashboard (mobile: Home) ─────────────── --}}
                     <li class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
                         <a class="nav-link" href="{{ route('dashboard') }}">
                             <i class="fa fa-tachometer-alt" aria-hidden="true"></i>
                             <span>Dashboard</span>
                         </a>
                     </li>
-
-                    {{-- ══════════════════════════════════════════════
-                         MASTER DATA
-                         Users · Accounts (COA/SHOA/Vendors/Customers)
-                         Products · Services
-                    ══════════════════════════════════════════════ --}}
 
                     {{-- ── Users & Roles ─────────────────────────── --}}
                     @if(auth()->user()->canAny(['user_roles.index', 'users.index']))
@@ -57,30 +51,17 @@
                     </li>
                     @endif
 
-                    {{-- ── Accounts ──────────────────────────────── --}}
-                    {{-- Groups: COA, Sub Heads, Vendors, Customers
-                         Vendors & Customers are accounting parties —
-                         each gets a COA entry on creation. --}}
+                    {{-- ── Accounts (mobile: Accounts tile) ──────── --}}
                     @php
-                        $accountsPerms = ['coa.index', 'shoa.index', 'vendors.index', 'customers.index'];
+                        $accountsPerms = ['coa.index', 'shoa.index'];
                     @endphp
                     @if(auth()->user()->canAny($accountsPerms))
-                    <li class="nav-parent {{ request()->routeIs('coa.*', 'shoa.*', 'vendors.*', 'customers.*') ? 'nav-expanded active' : '' }}">
+                    <li class="nav-parent {{ request()->routeIs('coa.*', 'shoa.*', 'account-mappings.*') ? 'nav-expanded active' : '' }}">
                         <a class="nav-link" href="#">
                             <i class="fa fa-book" aria-hidden="true"></i>
                             <span>Accounts</span>
                         </a>
                         <ul class="nav nav-children">
-                            @can('vendors.index')
-                            <li class="{{ request()->routeIs('vendors.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('vendors.index') }}">Vendors</a>
-                            </li>
-                            @endcan
-                            @can('customers.index')
-                            <li class="{{ request()->routeIs('customers.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('customers.index') }}">Customers</a>
-                            </li>
-                            @endcan
                             @can('coa.index')
                             <li class="{{ request()->routeIs('coa.*') ? 'active' : '' }}">
                                 <a class="nav-link" href="{{ route('coa.index') }}">Chart of Accounts</a>
@@ -91,11 +72,38 @@
                                 <a class="nav-link" href="{{ route('shoa.index') }}">Sub Heads</a>
                             </li>
                             @endcan
+                            @can('coa.index')
+                            <li class="{{ request()->routeIs('account-mappings.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('account-mappings.index') }}">Account Mappings</a>
+                            </li>
+                            @endcan
                         </ul>
                     </li>
                     @endif
 
-                    {{-- ── Products ──────────────────────────────── --}}
+                    {{-- ── Parties (mobile: Parties tile — separate from Accounts) ── --}}
+                    @if(auth()->user()->canAny(['customers.index', 'vendors.index']))
+                    <li class="nav-parent {{ request()->routeIs('customers.*', 'vendors.*') ? 'nav-expanded active' : '' }}">
+                        <a class="nav-link" href="#">
+                            <i class="fa fa-address-book" aria-hidden="true"></i>
+                            <span>Parties</span>
+                        </a>
+                        <ul class="nav nav-children">
+                            @can('customers.index')
+                            <li class="{{ request()->routeIs('customers.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('customers.index') }}">Customers</a>
+                            </li>
+                            @endcan
+                            @can('vendors.index')
+                            <li class="{{ request()->routeIs('vendors.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('vendors.index') }}">Vendors</a>
+                            </li>
+                            @endcan
+                        </ul>
+                    </li>
+                    @endif
+
+                    {{-- ── Products (mobile: Products tile) ──────── --}}
                     @php
                         $productPerms = [
                             'product_categories.index', 'product_subcategories.index',
@@ -138,99 +146,59 @@
                     </li>
                     @endif
 
-                    {{-- ══════════════════════════════════════════════
-                         OPERATIONS
-                         Projects (includes Sampling, Phases internally)
-                         Services · Purchase · Sale · Shipments
-                    ══════════════════════════════════════════════ --}}
-
-                    {{-- ── Projects ──────────────────────────────── --}}
-                    {{-- Services grouped here because they exist only
-                         to be assigned to project phases --}}
-                    @if(auth()->user()->canAny(['projects.index', 'services.index']))
-                    <li class="nav-parent {{ request()->routeIs('projects.*', 'services.*') ? 'nav-expanded active' : '' }}">
-                        <a class="nav-link" href="#">
-                            <i class="fa fa-project-diagram" aria-hidden="true"></i>
-                            <span>Projects</span>
+                    {{-- ── Orders (mobile: Orders tile) ──────────── --}}
+                    @can('orders.index')
+                    <li class="{{ request()->routeIs('orders.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('orders.index') }}">
+                            <i class="fa fa-shopping-bag" aria-hidden="true"></i>
+                            <span>Orders</span>
                         </a>
-                        <ul class="nav nav-children">
-                            @can('services.index')
-                            <li class="{{ request()->routeIs('services.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('services.index') }}">Services</a>
-                            </li>
-                            @endcan
-
-                            @can('projects.index')
-                            <li class="{{ request()->routeIs('projects.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('projects.index') }}">All Projects</a>
-                            </li>
-                            @endcan
-                        </ul>
                     </li>
-                    @endif
+                    @endcan
 
-                    {{-- ── Purchase ──────────────────────────────── --}}
-                    @if(auth()->user()->canAny(['purchase_orders.index', 'purchase_invoices.index', 'purchase_return.index']))
-                    <li class="nav-parent {{ request()->routeIs('purchase_orders.*', 'purchase_invoices.*', 'purchase_return.*') ? 'nav-expanded active' : '' }}">
-                        <a class="nav-link" href="#">
+                    {{-- ── Purchase (mobile: Purchase tile) ──────── --}}
+                    @can('purchase.index')
+                    <li class="{{ request()->routeIs('purchase.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('purchase.index') }}">
                             <i class="fa fa-shopping-cart" aria-hidden="true"></i>
                             <span>Purchase</span>
                         </a>
+                    </li>
+                    @endcan
+
+                    {{-- ── Jobs + Job Receives (mobile: Jobs / Receives tiles) ── --}}
+                    @if(auth()->user()->canAny(['jobs.index', 'job_receives.index']))
+                    <li class="nav-parent {{ request()->routeIs('jobs.*', 'job_receives.*') ? 'nav-expanded active' : '' }}">
+                        <a class="nav-link" href="#">
+                            <i class="fa fa-briefcase" aria-hidden="true"></i>
+                            <span>Jobs</span>
+                        </a>
                         <ul class="nav nav-children">
-                            @can('purchase_orders.index')
-                            <li class="{{ request()->routeIs('purchase_orders.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('purchase_orders.index') }}">Purchase Orders</a>
+                            @can('jobs.index')
+                            <li class="{{ request()->routeIs('jobs.*') && !request()->routeIs('jobs.receive.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('jobs.index') }}">All Jobs</a>
                             </li>
                             @endcan
-                            @can('purchase_invoices.index')
-                            <li class="{{ request()->routeIs('purchase_invoices.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('purchase_invoices.index') }}">Invoices</a>
-                            </li>
-                            @endcan
-                            @can('purchase_return.index')
-                            <li class="{{ request()->routeIs('purchase_return.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('purchase_return.index') }}">Returns</a>
+                            @can('job_receives.index')
+                            <li class="{{ request()->routeIs('job_receives.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('job_receives.index') }}">Job Receives</a>
                             </li>
                             @endcan
                         </ul>
                     </li>
                     @endif
 
-                    {{-- ── Sale ──────────────────────────────────── --}}
-                    {{-- Shipments grouped here — it's the last step
-                         of a sale: packed goods dispatched to customer --}}
-                    @if(auth()->user()->canAny(['sale_invoices.index', 'sale_return.index', 'shipments.index']))
-                    <li class="nav-parent {{ request()->routeIs('sale_invoices.*', 'sale_return.*', 'shipments.*') ? 'nav-expanded active' : '' }}">
-                        <a class="nav-link" href="#">
+                    {{-- ── Sale (mobile: Sale tile) ──────────────── --}}
+                    @can('sale.index')
+                    <li class="{{ request()->routeIs('sale.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('sale.index') }}">
                             <i class="fa fa-cash-register" aria-hidden="true"></i>
                             <span>Sale</span>
                         </a>
-                        <ul class="nav nav-children">
-                            @can('sale_invoices.index')
-                            <li class="{{ request()->routeIs('sale_invoices.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('sale_invoices.index') }}">Invoices</a>
-                            </li>
-                            @endcan
-                            @can('sale_return.index')
-                            <li class="{{ request()->routeIs('sale_return.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('sale_return.index') }}">Returns</a>
-                            </li>
-                            @endcan
-                            @can('shipments.index')
-                            <li class="{{ request()->routeIs('shipments.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('shipments.index') }}">Shipments</a>
-                            </li>
-                            @endcan
-                        </ul>
                     </li>
-                    @endif
+                    @endcan
 
-                    {{-- ══════════════════════════════════════════════
-                         FINANCE
-                         Vouchers · Reports
-                    ══════════════════════════════════════════════ --}}
-
-                    {{-- ── Vouchers ──────────────────────────────── --}}
+                    {{-- ── Vouchers (mobile: Payments tile — Payment voucher type) ── --}}
                     @can('vouchers.index')
                     <li class="nav-parent {{ request()->routeIs('vouchers.*') ? 'nav-expanded active' : '' }}">
                         <a class="nav-link" href="#">
@@ -247,11 +215,20 @@
                     </li>
                     @endcan
 
-                    {{-- ── Reports ───────────────────────────────── --}}
+                    {{-- ── Expenses (mobile: Expenses tile) ──────── --}}
+                    @can('expenses.index')
+                    <li class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('expenses.index') }}">
+                            <i class="fa fa-receipt" aria-hidden="true"></i>
+                            <span>Expenses</span>
+                        </a>
+                    </li>
+                    @endcan
+
+                    {{-- ── Reports (mobile: Reports + Party Ledger tiles) ── --}}
                     @php
                         $reportPerms = [
                             'reports.inventory', 'reports.purchase', 'reports.sales',
-                            'reports.project_costing', 'reports.project_profit_loss',
                             'reports.accounts_general_ledger', 'reports.accounts_trial_balance',
                             'reports.accounts_profit_loss', 'reports.accounts_balance_sheet',
                             'reports.accounts_receivables', 'reports.accounts_payables',
@@ -266,6 +243,12 @@
                             <span>Reports</span>
                         </a>
                         <ul class="nav nav-children">
+
+                            @can('reports.accounts_party_ledger')
+                            <li class="{{ request()->routeIs('reports.accounts_party_ledger') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('reports.accounts_party_ledger') }}">Party Ledger</a>
+                            </li>
+                            @endcan
 
                             @can('reports.inventory')
                             <li class="{{ request()->routeIs('reports.inventory') ? 'active' : '' }}">
@@ -283,27 +266,7 @@
                             </li>
                             @endcan
 
-                            {{-- Project reports --}}
-                            @if(auth()->user()->canAny(['reports.project_costing', 'reports.project_profit_loss']))
-                            <li class="nav-parent {{ request()->routeIs('reports.project*') ? 'nav-expanded active' : '' }}">
-                                <a class="nav-link" href="#">Projects</a>
-                                <ul class="nav nav-children">
-                                    @can('reports.project_costing')
-                                    <li class="{{ request()->routeIs('reports.project_costing') ? 'active' : '' }}">
-                                        <a class="nav-link" href="{{ route('reports.project_costing') }}">Costing</a>
-                                    </li>
-                                    @endcan
-                                    @can('reports.project_profit_loss')
-                                    <li class="{{ request()->routeIs('reports.project_profit_loss') ? 'active' : '' }}">
-                                        <a class="nav-link" href="{{ route('reports.project_profit_loss') }}">P&amp;L</a>
-                                    </li>
-                                    @endcan
-                                </ul>
-                            </li>
-                            @endif
-
-                            {{-- Accounting reports --}}
-                            @if(auth()->user()->canAny(array_slice($reportPerms, 5)))
+                            @if(auth()->user()->canAny(array_slice($reportPerms, 3)))
                             <li class="nav-parent {{ request()->routeIs('reports.accounts*') ? 'nav-expanded active' : '' }}">
                                 <a class="nav-link" href="#">Accounting</a>
                                 <ul class="nav nav-children">
@@ -314,7 +277,6 @@
                                         'reports.accounts_balance_sheet'      => 'Balance Sheet',
                                         'reports.accounts_receivables'        => 'Receivables',
                                         'reports.accounts_payables'           => 'Payables',
-                                        'reports.accounts_party_ledger'       => 'Party Ledger',
                                         'reports.accounts_cash_bank'          => 'Cash &amp; Bank',
                                         'reports.accounts_bank_reconciliation'=> 'Bank Reconciliation',
                                     ] as $perm => $label)
