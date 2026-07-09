@@ -44,6 +44,7 @@
                 <th>City</th>
                 <th>Credit Limit</th>
                 <th>Opening Balance</th>
+                <th>Current Balance</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -65,12 +66,23 @@
                 </td>
                 <td>
                   @if($customer->opening_balance > 0)
-                    <span class="text-{{ $customer->opening_balance_type === 'debit' ? 'success' : 'danger' }}">
+                    <span class="text-{{ $customer->opening_type === 'receivable' ? 'success' : 'danger' }}">
                       {{ number_format($customer->opening_balance, 2) }}
-                      <small>({{ ucfirst($customer->opening_balance_type) }})</small>
+                      <small>({{ ucfirst($customer->opening_type) }})</small>
                     </span>
                   @else
                     <span class="text-muted">—</span>
+                  @endif
+                </td>
+                <td>
+                  @php $bal = $customer->balance; @endphp
+                  @if($bal == 0)
+                    <span class="text-muted">Settled</span>
+                  @else
+                    <span class="text-{{ $bal < 0 ? 'danger' : 'success' }}">
+                      {{ number_format(abs($bal), 2) }}
+                      <small>({{ $bal < 0 ? 'Payable' : 'Receivable' }})</small>
+                    </span>
                   @endif
                 </td>
                 <td>
@@ -190,9 +202,9 @@
 
               <div class="col-lg-4 mb-2">
                 <label class="form-label">Balance Type</label>
-                <select class="form-control" name="opening_balance_type">
-                  <option value="debit">Debit (customer owes us)</option>
-                  <option value="credit">Credit (we owe customer)</option>
+                <select class="form-control" name="opening_type">
+                  <option value="receivable">Receivable (customer owes us)</option>
+                  <option value="payable">Payable (we owe customer)</option>
                 </select>
               </div>
 
@@ -301,10 +313,10 @@
 
               <div class="col-lg-4 mb-2">
                 <label class="form-label">Balance Type</label>
-                <select class="form-control" name="opening_balance_type"
-                        id="ec_opening_balance_type">
-                  <option value="debit">Debit (customer owes us)</option>
-                  <option value="credit">Credit (we owe customer)</option>
+                <select class="form-control" name="opening_type"
+                        id="ec_opening_type">
+                  <option value="receivable">Receivable (customer owes us)</option>
+                  <option value="payable">Payable (we owe customer)</option>
                 </select>
               </div>
 
@@ -367,7 +379,7 @@ function editCustomer(id) {
     $('#ec_opening_balance').val(data.opening_balance ?? 0);
     $('#ec_opening_balance_date').val(data.opening_balance_date
       ? data.opening_balance_date.substring(0, 10) : '');
-    $('#ec_opening_balance_type').val(data.opening_balance_type ?? 'debit');
+    $('#ec_opening_type').val(data.opening_type ?? 'receivable');
     $('#ec_is_active').val(data.is_active ? '1' : '0');
 
     $.magnificPopup.open({

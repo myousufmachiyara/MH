@@ -55,6 +55,7 @@
                 <th>Phone</th>
                 <th>City</th>
                 <th>Opening Balance</th>
+                <th>Current Balance</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -78,12 +79,23 @@
                 <td>{{ $vendor->city ?? '—' }}</td>
                 <td>
                   @if($vendor->opening_balance > 0)
-                    <span class="text-{{ $vendor->opening_balance_type === 'debit' ? 'success' : 'danger' }}">
+                    <span class="text-{{ $vendor->opening_type === 'receivable' ? 'success' : 'danger' }}">
                       {{ number_format($vendor->opening_balance, 2) }}
-                      <small>({{ ucfirst($vendor->opening_balance_type) }})</small>
+                      <small>({{ ucfirst($vendor->opening_type) }})</small>
                     </span>
                   @else
                     <span class="text-muted">—</span>
+                  @endif
+                </td>
+                <td>
+                  @php $bal = $vendor->balance; @endphp
+                  @if($bal == 0)
+                    <span class="text-muted">Settled</span>
+                  @else
+                    <span class="text-{{ $bal < 0 ? 'danger' : 'success' }}">
+                      {{ number_format(abs($bal), 2) }}
+                      <small>({{ $bal < 0 ? 'Payable' : 'Receivable' }})</small>
+                    </span>
                   @endif
                 </td>
                 <td>
@@ -207,9 +219,9 @@
 
               <div class="col-lg-4 mb-2">
                 <label class="form-label">Balance Type</label>
-                <select class="form-control" name="opening_balance_type">
-                  <option value="credit">Credit (we owe vendor)</option>
-                  <option value="debit">Debit (vendor owes us)</option>
+                <select class="form-control" name="opening_type">
+                  <option value="payable">Payable (we owe vendor)</option>
+                  <option value="receivable">Receivable (vendor owes us)</option>
                 </select>
               </div>
 
@@ -327,10 +339,10 @@
 
               <div class="col-lg-4 mb-2">
                 <label class="form-label">Balance Type</label>
-                <select class="form-control" name="opening_balance_type"
-                        id="ev_opening_balance_type">
-                  <option value="credit">Credit (we owe vendor)</option>
-                  <option value="debit">Debit (vendor owes us)</option>
+                <select class="form-control" name="opening_type"
+                        id="ev_opening_type">
+                  <option value="payable">Payable (we owe vendor)</option>
+                  <option value="receivable">Receivable (vendor owes us)</option>
                 </select>
               </div>
 
@@ -402,7 +414,7 @@ function editVendor(id) {
 
     // Select2 fields — trigger('change') to update visual
     $('#ev_vendor_type').val(data.vendor_type).trigger('change');
-    $('#ev_opening_balance_type').val(data.opening_balance_type ?? 'credit').trigger('change');
+    $('#ev_opening_type').val(data.opening_type ?? 'payable').trigger('change');
     $('#ev_is_active').val(data.is_active ? '1' : '0').trigger('change');
 
     $.magnificPopup.open({
