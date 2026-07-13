@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ChartOfAccounts;
-use App\Http\Resource\ChartOfAccountResource;
+use App\Http\Resources\ChartOfAccountResource;
 
 class ChartOfAccountApiController extends Controller
 {
