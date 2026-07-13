@@ -202,4 +202,58 @@ Route::middleware(['auth'])->group(function () {
         Route::get('bank-reconciliation', [AccountsReportController::class, 'bankReconciliation'])
             ->middleware('check.permission:reports.accounts_bank_reconciliation')->name('accounts_bank_reconciliation');
     });
+
+    // Purchase Invoice
+    Route::prefix('purchases')->name('purchase_invoices.')->group(function () {
+        Route::get('/', [PurchaseInvoiceController::class, 'index'])->name('index')->middleware('check.permission:purchase.index');
+        Route::get('create', [PurchaseInvoiceController::class, 'create'])->name('create')->middleware('check.permission:purchase.create');
+        Route::post('/', [PurchaseInvoiceController::class, 'store'])->name('store')->middleware('check.permission:purchase.create');
+        Route::get('{id}/edit', [PurchaseInvoiceController::class, 'edit'])->name('edit')->middleware('check.permission:purchase.edit');
+        Route::put('{id}', [PurchaseInvoiceController::class, 'update'])->name('update')->middleware('check.permission:purchase.edit');
+        Route::delete('{id}', [PurchaseInvoiceController::class, 'destroy'])->name('destroy')->middleware('check.permission:purchase.delete');
+        Route::patch('{id}/restore', [PurchaseInvoiceController::class, 'restore'])->name('restore')->middleware('check.permission:purchase.edit');
+        Route::get('{id}/print', [PurchaseInvoiceController::class, 'print'])->name('print')->middleware('check.permission:purchase.print');
+    });
+
+    // Purchase Order
+    Route::prefix('purchase-orders')->name('purchase_orders.')->group(function () {
+        Route::get('/', [PurchaseOrderController::class, 'index'])->name('index')->middleware('check.permission:purchase.index');
+        Route::get('create', [PurchaseOrderController::class, 'create'])->name('create')->middleware('check.permission:purchase.create');
+        Route::post('/', [PurchaseOrderController::class, 'store'])->name('store')->middleware('check.permission:purchase.create');
+        Route::get('{id}/edit', [PurchaseOrderController::class, 'edit'])->name('edit')->middleware('check.permission:purchase.edit');
+        Route::put('{id}', [PurchaseOrderController::class, 'update'])->name('update')->middleware('check.permission:purchase.edit');
+        Route::delete('{id}', [PurchaseOrderController::class, 'destroy'])->name('destroy')->middleware('check.permission:purchase.delete');
+        Route::patch('{id}/restore', [PurchaseOrderController::class, 'restore'])->name('restore')->middleware('check.permission:purchase.edit');
+        Route::get('{id}/print', [PurchaseOrderController::class, 'print'])->name('print')->middleware('check.permission:purchase.print');
+    });
+
+    // Purchase Return
+    Route::prefix('purchase-returns')->name('purchase_returns.')->group(function () {
+        Route::get('/', [PurchaseReturnController::class, 'index'])->name('index')->middleware('check.permission:purchase.index');
+        Route::get('create', [PurchaseReturnController::class, 'create'])->name('create')->middleware('check.permission:purchase.create');
+        Route::get('purchase/{purchaseId}/items', [PurchaseReturnController::class, 'purchaseItems'])->name('purchase_items');
+        Route::post('/', [PurchaseReturnController::class, 'store'])->name('store')->middleware('check.permission:purchase.create');
+        Route::get('{id}/edit', [PurchaseReturnController::class, 'edit'])->name('edit')->middleware('check.permission:purchase.edit');
+        Route::put('{id}', [PurchaseReturnController::class, 'update'])->name('update')->middleware('check.permission:purchase.edit');
+        Route::delete('{id}', [PurchaseReturnController::class, 'destroy'])->name('destroy')->middleware('check.permission:purchase.delete');
+        Route::get('{id}/print', [PurchaseReturnController::class, 'print'])->name('print')->middleware('check.permission:purchase.print');
+    });
+
+    Route::prefix('gate-passes')->name('gate_passes.')->group(function () {
+        Route::get('/', [GatePassController::class, 'index'])->name('index')->middleware('check.permission:purchase.index');
+        Route::get('create', [GatePassController::class, 'create'])->name('create')->middleware('check.permission:purchase.create');
+        Route::post('/', [GatePassController::class, 'store'])->name('store')->middleware('check.permission:purchase.create');
+        Route::delete('{id}', [GatePassController::class, 'destroy'])->name('destroy')->middleware('check.permission:purchase.delete');
+        Route::get('{id}/print', [GatePassController::class, 'print'])->name('print')->middleware('check.permission:purchase.print');
+    });
+
+    Route::prefix('jobs')->name('jobs.')->group(function () {
+        Route::get('/', [JobOrderController::class, 'index'])->name('index')->middleware('check.permission:jobs.index');
+        Route::get('create', [JobOrderController::class, 'create'])->name('create')->middleware('check.permission:jobs.create');
+        Route::get('available-stock', [JobOrderController::class, 'availableStock'])->name('available_stock')->middleware('check.permission:jobs.index');
+        Route::post('/', [JobOrderController::class, 'store'])->name('store')->middleware('check.permission:jobs.create');
+        Route::get('{id}', [JobOrderController::class, 'show'])->name('show')->middleware('check.permission:jobs.index');
+        Route::delete('{id}', [JobOrderController::class, 'destroy'])->name('destroy')->middleware('check.permission:jobs.delete');
+        Route::get('{id}/print', [JobOrderController::class, 'print'])->name('print')->middleware('check.permission:jobs.print');
+    });
 });

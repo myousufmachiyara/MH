@@ -6,33 +6,35 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('vouchers', function (Blueprint $table) {
-            $table->id(); 
-            $table->string('voucher_type', 50); // flexible, can be 'payment', 'receipt', 'journal', or any future type
-            $table->date('date');
-            $table->unsignedBigInteger('ac_dr_sid'); 
-            $table->unsignedBigInteger('ac_cr_sid'); 
-            $table->decimal('amount', 12, 2);
-            $table->string('reference')->nullable();
-            $table->text('remarks')->nullable();
-            $table->string('description')->nullable();
+            $table->id();
+            $table->string('voucher_no', 30)->unique();
+            $table->string('type', 20); // payment | receipt | journal | contra | system
+            $table->date('voucher_date');
+            $table->string('narration')->nullable();
             $table->json('attachments')->nullable();
+
+            // Links back to the source document (Purchase/Sale/JobOrderReceive/Expense),
+            // null for manually-created vouchers (Payment/Receipt/Journal/Contra)
+            $table->string('reference_type', 30)->nullable();
+            $table->unsignedBigInteger('reference_id')->nullable();
+
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+
             $table->timestamps();
             $table->softDeletes();
 
-            $table->foreign('ac_dr_sid')->references('id')->on('chart_of_accounts')->onDelete('cascade');
-            $table->foreign('ac_cr_sid')->references('id')->on('chart_of_accounts')->onDelete('cascade');
+            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('updated_by')->references('id')->on('users')->onDelete('set null');
+
+            $table->index('type', 'idx_vouchers_type');
+            $table->index(['reference_type', 'reference_id'], 'idx_vouchers_reference');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('vouchers');

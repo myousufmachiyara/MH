@@ -1,0 +1,83 @@
+@extends('layouts.app')
+
+@section('title', 'Gate Passes | All')
+
+@section('content')
+<div class="row">
+    <div class="col">
+        <section class="card">
+            @if (session('success'))
+                <div class="alert alert-success">{{ session('success') }}</div>
+            @elseif (session('error'))
+                <div class="alert alert-danger">{{ session('error') }}</div>
+            @endif
+
+            <header class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="card-title">Gate Passes</h2>
+                @can('purchase.create')
+                <a href="{{ route('gate_passes.create') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Gate Pass
+                </a>
+                @endcan
+            </header>
+
+            <div class="card-body">
+                <div class="alert alert-info py-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    A gate pass sends raw material to a vendor's location. Stock becomes available
+                    at the vendor as <strong>Fresh</strong> until issued to a job.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped" id="gatePassTable">
+                        <thead>
+                            <tr>
+                                <th width="4%">#</th>
+                                <th>Date</th>
+                                <th>Gate Pass #</th>
+                                <th>Vendor</th>
+                                <th>Product</th>
+                                <th class="text-end">Quantity</th>
+                                <th>Remarks</th>
+                                <th width="8%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($gatePasses as $index => $gp)
+                            <tr>
+                                <td>{{ $index + 1 }}</td>
+                                <td>{{ \Carbon\Carbon::parse($gp->entry_date)->format('d-M-Y') }}</td>
+                                <td class="text-primary">{{ $gp->doc_no }}</td>
+                                <td>{{ $gp->vendor->name ?? 'N/A' }}</td>
+                                <td>{{ $gp->product->name ?? 'N/A' }}</td>
+                                <td class="text-end">{{ number_format($gp->quantity, 3) }}</td>
+                                <td class="text-muted small">{{ Str::limit($gp->remarks, 40) }}</td>
+                                <td>
+                                    <a href="{{ route('gate_passes.print', $gp->id) }}" target="_blank" class="text-success mr-2" title="Print">
+                                        <i class="fas fa-print"></i>
+                                    </a>
+                                    @can('purchase.delete')
+                                    <form action="{{ route('gate_passes.destroy', $gp->id) }}" method="POST" style="display:inline;">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-link p-0 text-danger" onclick="return confirm('Delete this gate pass?')" title="Delete">
+                                            <i class="fa fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                    @endcan
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#gatePassTable').DataTable({ pageLength: 50, order: [[0, 'desc']] });
+    });
+</script>
+@endsection

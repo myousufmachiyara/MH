@@ -12,13 +12,14 @@ class Voucher extends Model
     protected $table = 'vouchers';
 
     protected $fillable = [
-        'voucher_no', 'type', 'voucher_date', 'narration',
+        'voucher_no', 'type', 'voucher_date', 'narration', 'attachments',
         'reference_type', 'reference_id',
         'created_by', 'updated_by',
     ];
 
     protected $casts = [
         'voucher_date' => 'date',
+        'attachments'  => 'array',
     ];
 
     public function entries()

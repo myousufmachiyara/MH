@@ -13,8 +13,8 @@ class Purchase extends Model
 
     protected $fillable = [
         'purchase_no', 'vendor_id', 'order_id', 'purchase_date',
-        'subtotal', 'tax_amount', 'total_amount', 'status', 'remarks',
-        'created_by', 'updated_by',
+        'bill_no', 'ref_no', 'subtotal', 'tax_amount', 'total_amount',
+        'status', 'remarks', 'attachments', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
@@ -22,6 +22,7 @@ class Purchase extends Model
         'subtotal'      => 'decimal:2',
         'tax_amount'    => 'decimal:2',
         'total_amount'  => 'decimal:2',
+        'attachments'   => 'array',
     ];
 
     public function vendor() { return $this->belongsTo(Vendor::class, 'vendor_id'); }

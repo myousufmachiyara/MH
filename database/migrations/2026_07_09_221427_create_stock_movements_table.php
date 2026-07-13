@@ -10,27 +10,24 @@ return new class extends Migration
     {
         Schema::create('stock_movements', function (Blueprint $table) {
             $table->id();
+            $table->string('gate_pass_no', 30)->unique();
+
+            $table->unsignedBigInteger('vendor_id');
             $table->unsignedBigInteger('product_id');
+            $table->decimal('quantity', 15, 3);
 
-            // Purchase|Sale|JobIssue|JobReceive|TransferIn|TransferOut|Adjustment|Consume
-            $table->string('movement_type', 30);
-
-            $table->decimal('quantity', 15, 3); // signed: +in, -out
-            $table->decimal('amount', 15, 2)->default(0); // value of the movement (for stock valuation)
-
-            // polymorphic-style reference back to the source document
-            $table->string('reference_type', 30); // 'Purchase'|'Sale'|'Job'|'JobReceive'
-            $table->unsignedBigInteger('reference_id');
-
-            $table->string('location', 50)->nullable(); // e.g. warehouse, or 'at vendor: X'
             $table->date('movement_date');
+            $table->text('remarks')->nullable();
 
+            $table->unsignedBigInteger('created_by');
+            $table->unsignedBigInteger('updated_by');
             $table->timestamps();
+            $table->softDeletes();
 
+            $table->foreign('vendor_id')->references('id')->on('vendors')->onDelete('cascade');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
-
-            $table->index('movement_type', 'idx_sm_movement_type');
-            $table->index(['reference_type', 'reference_id'], 'idx_sm_reference');
+            $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('updated_by')->references('id')->on('users')->onDelete('cascade');
         });
     }
 

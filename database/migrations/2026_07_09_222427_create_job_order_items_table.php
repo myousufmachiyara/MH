@@ -11,8 +11,12 @@ return new class extends Migration
         Schema::create('job_order_items', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('job_order_id');
-            $table->unsignedBigInteger('product_id'); // raw material/product issued
-            $table->decimal('quantity_issued', 15, 3);
+            $table->unsignedBigInteger('product_id');
+            $table->decimal('quantity', 15, 3);
+
+            // Which pool it was drawn from — for traceability/reporting
+            $table->string('source_status', 20)->nullable(); // 'fresh' | 'leftover' | 'mixed'
+
             $table->timestamps();
 
             $table->foreign('job_order_id')->references('id')->on('job_orders')->onDelete('cascade');

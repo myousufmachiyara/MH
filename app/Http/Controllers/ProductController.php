@@ -12,22 +12,14 @@ use App\Models\ProductVariation;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
-// FIX: removed dead imports that don't exist in this project:
-//   Picqer\Barcode\BarcodeGeneratorPNG  — barcode package not installed
-//   Maatwebsite\Excel\Facades\Excel      — excel package not installed
-//   ProductPart                          — model doesn't exist
-// These caused class-not-found errors on any request hitting this controller.
-
 class ProductController extends Controller
 {
-    // ─────────────────────────────────────────────────────────────────
     public function index()
     {
         $products = Product::with(['category', 'subcategory', 'variations'])->get();
         return view('products.index', compact('products'));
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function create()
     {
         $categories = ProductCategory::all();
@@ -37,7 +29,6 @@ class ProductController extends Controller
         return view('products.create', compact('categories', 'attributes', 'units'));
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function store(Request $request)
     {
         $request->validate([
@@ -69,9 +60,6 @@ class ProductController extends Controller
                         'selling_price'  => $variationData['selling_price'] ?? 0,
                     ]);
 
-                    // FIX: attribute_value_ids come as a flat array from the
-                    // hidden inputs in create.blade.php, not nested objects.
-                    // Extract just the IDs for sync().
                     if (!empty($variationData['attributes'])) {
                         $attributeValueIds = collect($variationData['attributes'])
                             ->pluck('attribute_value_id')
@@ -101,15 +89,12 @@ class ProductController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // show() redirects to index — products don't have a detail page
     public function show(Product $product)
     {
         return redirect()->route('products.index');
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // details() — AJAX: returns product info for purchase invoice row
+    // AJAX: returns product info for purchase/sale invoice row
     public function details(Request $request)
     {
         try {
@@ -128,7 +113,6 @@ class ProductController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function edit($id)
     {
         $product = Product::with([
@@ -142,15 +126,10 @@ class ProductController extends Controller
         $units         = MeasurementUnit::all();
 
         return view('products.edit', compact(
-            'product',
-            'categories',
-            'subcategories',
-            'attributes',
-            'units'
+            'product', 'categories', 'subcategories', 'attributes', 'units'
         ));
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function update(Request $request, $id)
     {
         $request->validate([
@@ -174,11 +153,8 @@ class ProductController extends Controller
                 'selling_price', 'is_active',
             ]));
 
-            // ── Update existing variations ───────────────────────────
             if (is_array($request->variations)) {
                 foreach ($request->variations as $variationData) {
-                    // FIX: was using findOrFail without checking the variation
-                    // actually belongs to this product — security gap.
                     $variation = ProductVariation::where('id', $variationData['id'])
                         ->where('product_id', $product->id)
                         ->firstOrFail();
@@ -195,7 +171,6 @@ class ProductController extends Controller
                 }
             }
 
-            // ── Add new variations ───────────────────────────────────
             if (is_array($request->new_variations)) {
                 foreach ($request->new_variations as $newVar) {
                     $variation = $product->variations()->create([
@@ -210,10 +185,7 @@ class ProductController extends Controller
                 }
             }
 
-            // ── Remove deleted variations ────────────────────────────
             if ($request->filled('removed_variations')) {
-                // FIX: must also check product_id ownership to prevent
-                // deleting variations from other products via crafted requests
                 ProductVariation::whereIn('id', $request->removed_variations)
                     ->where('product_id', $product->id)
                     ->delete();
@@ -238,30 +210,31 @@ class ProductController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
     public function destroy($id)
     {
-        // FIX: original had no try/catch — any exception caused unhandled 500
         try {
             $product = Product::findOrFail($id);
 
-            // Guard: products referenced in purchase/sale invoices cannot be deleted
-            // FIX: original had no guard — deleting a product mid-project corrupts
-            // invoice history. Soft delete is fine but check first.
-            $usedInPurchase = DB::table('purchase_invoice_items')
-                ->where('item_id', $product->id)
-                ->exists();
-
-            $usedInSale = DB::table('sale_invoice_items')
+            // FIX: was querying dead tables purchase_invoice_items/sale_invoice_items.
+            // Corrected to the actual current tables.
+            $usedInPurchase = DB::table('purchase_items')
                 ->where('product_id', $product->id)
                 ->exists();
 
-            if ($usedInPurchase || $usedInSale) {
+            $usedInSale = DB::table('sale_items')
+                ->where('product_id', $product->id)
+                ->exists();
+
+            $usedInStockMovements = DB::table('stock_movements')
+                ->where('product_id', $product->id)
+                ->exists();
+
+            if ($usedInPurchase || $usedInSale || $usedInStockMovements) {
                 return redirect()->back()
-                    ->with('error', 'Cannot delete "' . $product->name . '" — it is used in invoices. Deactivate it instead.');
+                    ->with('error', 'Cannot delete "' . $product->name . '" — it has transaction history. Deactivate it instead.');
             }
 
-            $product->delete(); // soft delete
+            $product->delete();
 
             Log::info('[Product] Deleted', ['id' => $id, 'by' => auth()->id()]);
 
@@ -275,24 +248,17 @@ class ProductController extends Controller
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // getVariations() — AJAX: used by purchase invoice and project phase
-    // dropdowns to populate variation select after product is chosen.
-    // Route: helpers.product.variations
+    // AJAX: variation dropdown for purchase/sale invoice item rows
     public function getVariations($productId)
     {
         try {
-            $product = Product::with([
-                'variations.attributeValues',
-                'measurementUnit',
-            ])->findOrFail($productId);
+            $product = Product::with(['variations.attributeValues', 'measurementUnit'])
+                ->findOrFail($productId);
 
             $unitId = $product->measurement_unit;
 
             $variations = $product->variations->map(function ($v) use ($unitId) {
-                // Build human-readable label from attribute values
                 $label = $v->attributeValues->map(fn($av) => $av->value)->implode(' - ');
-
                 return [
                     'id'    => $v->id,
                     'sku'   => $v->sku,
@@ -321,17 +287,5 @@ class ProductController extends Controller
                 'message'   => 'Product not found.',
             ], 404);
         }
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // getLocationStock() — kept for backward compatibility but flagged:
-    // references tables (stock_transfers, stock_transfer_details,
-    // sale_invoice_items with location_id) that don't exist in this
-    // project's migration set. Will throw SQL errors if called.
-    // Remove once confirmed unused, or build the tables first.
-    public function getLocationStock(Request $request)
-    {
-        // TODO: remove or implement properly when stock transfer module is built
-        return response()->json(['stock' => 0]);
     }
 }

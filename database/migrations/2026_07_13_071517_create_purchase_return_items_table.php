@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('purchase_items', function (Blueprint $table) {
+        Schema::create('purchase_return_items', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('purchase_id');
+            $table->unsignedBigInteger('purchase_return_id');
+            $table->unsignedBigInteger('purchase_item_id'); // the original line being returned
             $table->unsignedBigInteger('product_id');
-            $table->unsignedBigInteger('product_variation_id')->nullable();
 
             $table->decimal('quantity', 15, 3);
             $table->decimal('unit_price', 15, 2);
@@ -20,14 +20,14 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->foreign('purchase_id')->references('id')->on('purchases')->onDelete('cascade');
+            $table->foreign('purchase_return_id')->references('id')->on('purchase_returns')->onDelete('cascade');
+            $table->foreign('purchase_item_id')->references('id')->on('purchase_items')->onDelete('cascade');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
-            $table->foreign('product_variation_id')->references('id')->on('product_variations')->onDelete('set null');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('purchase_items');
+        Schema::dropIfExists('purchase_return_items');
     }
 };

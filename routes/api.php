@@ -6,6 +6,9 @@ use App\Http\Controllers\Api\ChartOfAccountApiController;
 use App\Http\Controllers\Api\AccountMappingApiController;
 use App\Http\Controllers\Api\VendorApiController;
 use App\Http\Controllers\Api\CustomerApiController;
+use App\Http\Controllers\Api\ProductApiController;
+use App\Http\Controllers\Api\ProductCategoryApiController;
+use App\Http\Controllers\Api\MeasurementUnitApiController;
 
 Route::post('login', [AuthApiController::class, 'login']);
 
@@ -33,4 +36,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('customers',       [CustomerApiController::class, 'store'])   ->middleware('check.permission:customers.create');
     Route::put('customers/{id}',   [CustomerApiController::class, 'update'])  ->middleware('check.permission:customers.edit');
     Route::delete('customers/{id}',[CustomerApiController::class, 'destroy']) ->middleware('check.permission:customers.delete');
+
+    Route::get('products',              [ProductApiController::class, 'index'])       ->middleware('check.permission:products.index');
+    Route::get('products/suggest-sku',  [ProductApiController::class, 'suggestSku'])   ->middleware('check.permission:products.create');
+    Route::get('products/{id}',         [ProductApiController::class, 'show'])         ->middleware('check.permission:products.index');
+    Route::post('products',             [ProductApiController::class, 'store'])        ->middleware('check.permission:products.create');
+    Route::put('products/{id}',         [ProductApiController::class, 'update'])       ->middleware('check.permission:products.edit');
+    Route::delete('products/{id}',      [ProductApiController::class, 'destroy'])      ->middleware('check.permission:products.delete');
+
+    Route::get('product-categories',                    [ProductCategoryApiController::class, 'index'])         ->middleware('check.permission:products.index');
+    Route::get('product-categories/{id}/subcategories',  [ProductCategoryApiController::class, 'subcategories']) ->middleware('check.permission:products.index');
+
+    Route::get('units', [MeasurementUnitApiController::class, 'index'])->middleware('check.permission:products.index');
 });

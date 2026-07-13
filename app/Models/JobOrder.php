@@ -12,11 +12,14 @@ class JobOrder extends Model
     protected $table = 'job_orders';
 
     protected $fillable = [
-        'job_no', 'order_id', 'vendor_id', 'job_type',
+        'job_no', 'vendor_id', 'sale_id', 'job_type',
         'status', 'issue_date', 'remarks', 'created_by', 'updated_by',
     ];
 
-    public function order()   { return $this->belongsTo(Order::class, 'order_id'); }
+    protected $casts = [
+        'issue_date' => 'date',
+    ];
+
     public function vendor()  { return $this->belongsTo(Vendor::class, 'vendor_id'); }
     public function items()   { return $this->hasMany(JobOrderItem::class, 'job_order_id'); }
     public function receives(){ return $this->hasMany(JobOrderReceive::class, 'job_order_id'); }

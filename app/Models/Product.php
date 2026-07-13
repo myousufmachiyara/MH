@@ -19,10 +19,16 @@ class Product extends Model
         'selling_price',
         'measurement_unit',
         'is_active',
+        'track_lots',
     ];
-    /* ----------------- Relationships ----------------- */
 
-    // Belongs to category
+    protected $casts = [
+        'opening_stock' => 'decimal:2',
+        'selling_price' => 'decimal:2',
+        'is_active'     => 'boolean',
+        'track_lots'    => 'boolean',
+    ];
+
     public function category()
     {
         return $this->belongsTo(ProductCategory::class, 'category_id');
@@ -33,36 +39,65 @@ class Product extends Model
         return $this->belongsTo(ProductSubcategory::class, 'subcategory_id');
     }
 
-    // Has many variations
     public function variations()
     {
         return $this->hasMany(ProductVariation::class);
     }
 
-    // Has many images
     public function images()
     {
         return $this->hasMany(ProductImage::class);
     }
 
-    // Belongs to measurement unit
     public function measurementUnit()
     {
         return $this->belongsTo(MeasurementUnit::class, 'measurement_unit');
     }
 
-    public function purchaseInvoices() 
+    public function purchaseItems()
     {
-        return $this->hasMany(PurchaseInvoiceItem::class, 'item_id');
+        return $this->hasMany(PurchaseItem::class, 'product_id');
     }
 
-    public function saleInvoices() 
+    public function saleItems()
     {
-        return $this->hasMany(SaleInvoiceItem::class, 'product_id');
+        return $this->hasMany(SaleItem::class, 'product_id');
+    }
+
+    public function stockMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'product_id');
     }
 
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    // Weighted Average Cost — computed from actual purchases, not stored.
+    // WAC = total value received / total quantity received
+    public function getWeightedAverageCostAttribute(): float
+    {
+        $totals = $this->stockMovements()
+            ->where('movement_type', 'Purchase')
+            ->selectRaw('COALESCE(SUM(amount),0) as total_value, COALESCE(SUM(quantity),0) as total_qty')
+            ->first();
+
+        $qty = (float) ($totals->total_qty ?? 0);
+        if ($qty <= 0) {
+            return 0;
+        }
+
+        return (float) $totals->total_value / $qty;
+    }
+
+    // Current stock on hand — opening + all movements (in - out)
+    public function getCurrentStockAttribute(): float
+    {
+        $net = $this->stockMovements()
+            ->selectRaw('COALESCE(SUM(quantity),0) as net')
+            ->value('net');
+
+        return (float) $this->opening_stock + (float) $net;
     }
 }
