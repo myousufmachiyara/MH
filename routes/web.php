@@ -255,5 +255,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{id}', [JobOrderController::class, 'show'])->name('show')->middleware('check.permission:jobs.index');
         Route::delete('{id}', [JobOrderController::class, 'destroy'])->name('destroy')->middleware('check.permission:jobs.delete');
         Route::get('{id}/print', [JobOrderController::class, 'print'])->name('print')->middleware('check.permission:jobs.print');
+
+        Route::post('{id}/comments', [JobOrderController::class, 'addComment'])->name('comments.store')->middleware('check.permission:jobs.index');
+        Route::delete('{jobId}/comments/{commentId}', [JobOrderController::class, 'deleteComment'])->name('comments.destroy')->middleware('check.permission:jobs.index');
+    });
+
+    Route::prefix('job-receives')->name('job_receives.')->group(function () {
+        Route::get('/', [JobOrderReceiveController::class, 'index'])->name('index')->middleware('check.permission:job_receives.index');
+        Route::get('create', [JobOrderReceiveController::class, 'create'])->name('create')->middleware('check.permission:job_receives.create');
+        Route::get('outstanding/{jobOrderId}', [JobOrderReceiveController::class, 'outstanding'])->name('outstanding')->middleware('check.permission:job_receives.index');
+        Route::post('/', [JobOrderReceiveController::class, 'store'])->name('store')->middleware('check.permission:job_receives.create');
+        Route::get('{id}', [JobOrderReceiveController::class, 'show'])->name('show')->middleware('check.permission:job_receives.index');
+        Route::delete('{id}', [JobOrderReceiveController::class, 'destroy'])->name('destroy')->middleware('check.permission:job_receives.delete');
+        Route::get('{id}/print', [JobOrderReceiveController::class, 'print'])->name('print')->middleware('check.permission:job_receives.print');
     });
 });

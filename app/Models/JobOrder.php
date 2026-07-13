@@ -23,4 +23,5 @@ class JobOrder extends Model
     public function vendor()  { return $this->belongsTo(Vendor::class, 'vendor_id'); }
     public function items()   { return $this->hasMany(JobOrderItem::class, 'job_order_id'); }
     public function receives(){ return $this->hasMany(JobOrderReceive::class, 'job_order_id'); }
+    public function comments() { return $this->hasMany(JobOrderComment::class, 'job_order_id')->latest(); }
 }

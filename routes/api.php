@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\CustomerApiController;
 use App\Http\Controllers\Api\ProductApiController;
 use App\Http\Controllers\Api\ProductCategoryApiController;
 use App\Http\Controllers\Api\MeasurementUnitApiController;
+use App\Http\Controllers\Api\JobOrderApiController;
+use App\Http\Controllers\Api\JobOrderReceiveApiController;
 
 Route::post('login', [AuthApiController::class, 'login']);
 
@@ -48,4 +50,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('product-categories/{id}/subcategories',  [ProductCategoryApiController::class, 'subcategories']) ->middleware('check.permission:products.index');
 
     Route::get('units', [MeasurementUnitApiController::class, 'index'])->middleware('check.permission:products.index');
+
+    Route::get('jobs',                    [JobOrderApiController::class, 'index'])          ->middleware('check.permission:jobs.index');
+    Route::get('jobs/available-stock',    [JobOrderApiController::class, 'availableStock'])  ->middleware('check.permission:jobs.index');
+    Route::get('jobs/{id}',               [JobOrderApiController::class, 'show'])            ->middleware('check.permission:jobs.index');
+    Route::post('jobs',                   [JobOrderApiController::class, 'store'])           ->middleware('check.permission:jobs.create');
+    Route::delete('jobs/{id}',            [JobOrderApiController::class, 'destroy'])         ->middleware('check.permission:jobs.delete');
+    Route::get('jobs/{id}/comments',      [JobOrderApiController::class, 'getComments'])     ->middleware('check.permission:jobs.index');
+    Route::post('jobs/{id}/comments',     [JobOrderApiController::class, 'addComment'])      ->middleware('check.permission:jobs.index');
+    
+    Route::get('job-receives',                          [JobOrderReceiveApiController::class, 'index'])           ->middleware('check.permission:job_receives.index');
+    Route::get('job-receives/pending-jobs',              [JobOrderReceiveApiController::class, 'pendingJobOrders'])->middleware('check.permission:job_receives.index');
+    Route::get('job-receives/outstanding/{jobOrderId}',  [JobOrderReceiveApiController::class, 'outstanding'])     ->middleware('check.permission:job_receives.index');
+    Route::get('job-receives/{id}',                      [JobOrderReceiveApiController::class, 'show'])           ->middleware('check.permission:job_receives.index');
+    Route::post('job-receives',                          [JobOrderReceiveApiController::class, 'store'])          ->middleware('check.permission:job_receives.create');
+    Route::delete('job-receives/{id}',                   [JobOrderReceiveApiController::class, 'destroy'])        ->middleware('check.permission:job_receives.delete');
 });

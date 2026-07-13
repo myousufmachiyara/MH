@@ -106,4 +106,41 @@ class JobOrderController extends Controller
     {
         abort(404, 'Print not yet implemented');
     }
+    public function addComment(Request $request, $id)
+    {
+        $request->validate(['comment' => 'required|string|max:1000']);
+
+        try {
+            $jobOrder = JobOrder::findOrFail($id);
+
+            $jobOrder->comments()->create([
+                'user_id' => auth()->id(),
+                'comment' => $request->comment,
+            ]);
+
+            return back()->with('success', 'Comment added.');
+
+        } catch (\Exception $e) {
+            Log::error('[JobOrder] Comment failed', ['id' => $id, 'message' => $e->getMessage()]);
+            return back()->with('error', 'Could not add comment.');
+        }
+    }
+
+    public function deleteComment($jobId, $commentId)
+    {
+        try {
+            $comment = \App\Models\JobOrderComment::where('job_order_id', $jobId)->findOrFail($commentId);
+
+            // Only the author or an admin-level user can delete their comment
+            if ($comment->user_id !== auth()->id() && !auth()->user()->hasRole(['superadmin', 'admin'])) {
+                abort(403);
+            }
+
+            $comment->delete();
+            return back()->with('success', 'Comment deleted.');
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Could not delete comment.');
+        }
+    }
 }
