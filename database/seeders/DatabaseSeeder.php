@@ -52,12 +52,16 @@ class DatabaseSeeder extends Seeder
         // MODULE PERMISSIONS
         //
         // Canonical module list — MUST match:
-        //   • routes/web.php module list
+        //   • routes/web.php module list + dedicated route blocks
+        //     (purchase invoices/orders/returns, gate passes, jobs,
+        //      job receives each have their own route block — NOT the
+        //      generic CRUD loop — but they share these same permission
+        //      names, so the seeder still owns the permission strings)
         //   • sidebar-left.blade.php nav groups
         //   • mobile app dashboard tiles + bottom nav
         //
         // Core business flow (mirrors mobile exactly):
-        //   Orders → Purchase → Jobs → Job Receives → Sale
+        //   Orders → Gate Pass → Purchase → Jobs → Job Receives → Sale
         //
         // Old Projects/Phases/Sampling/Shipments/Services concept is
         // RETIRED — mobile never used it, web and mobile now share one flow.
@@ -79,6 +83,7 @@ class DatabaseSeeder extends Seeder
 
             // Core flow — matches mobile dashboard/bottom-nav 1:1
             'orders',
+            'gate_passes',
             'purchase',
             'jobs',
             'job_receives',
@@ -141,6 +146,7 @@ class DatabaseSeeder extends Seeder
         $operatorRole->syncPermissions(
             Permission::where(function ($q) {
                 $q->where('name', 'like', 'orders.%')
+                  ->orWhere('name', 'like', 'gate_passes.%')
                   ->orWhere('name', 'like', 'jobs.%')
                   ->orWhere('name', 'like', 'job_receives.%')
                   ->orWhere('name', 'like', 'purchase.%')

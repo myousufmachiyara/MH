@@ -52,10 +52,7 @@
                     @endif
 
                     {{-- ── Accounts (mobile: Accounts tile) ──────── --}}
-                    @php
-                        $accountsPerms = ['coa.index', 'shoa.index'];
-                    @endphp
-                    @if(auth()->user()->canAny($accountsPerms))
+                    @if(auth()->user()->canAny(['coa.index', 'shoa.index']))
                     <li class="nav-parent {{ request()->routeIs('coa.*', 'shoa.*', 'account-mappings.*') ? 'nav-expanded active' : '' }}">
                         <a class="nav-link" href="#">
                             <i class="fa fa-book" aria-hidden="true"></i>
@@ -81,7 +78,7 @@
                     </li>
                     @endif
 
-                    {{-- ── Parties (mobile: Parties tile — separate from Accounts) ── --}}
+                    {{-- ── Parties (mobile: Parties tile) ────────── --}}
                     @if(auth()->user()->canAny(['customers.index', 'vendors.index']))
                     <li class="nav-parent {{ request()->routeIs('customers.*', 'vendors.*') ? 'nav-expanded active' : '' }}">
                         <a class="nav-link" href="#">
@@ -147,6 +144,8 @@
                     @endif
 
                     {{-- ── Orders (mobile: Orders tile) ──────────── --}}
+                    {{-- NOT YET BUILT — OrderController referenced in routes but not implemented.
+                         Uncomment once built.
                     @can('orders.index')
                     <li class="{{ request()->routeIs('orders.*') ? 'active' : '' }}">
                         <a class="nav-link" href="{{ route('orders.index') }}">
@@ -155,16 +154,40 @@
                         </a>
                     </li>
                     @endcan
+                    --}}
 
-                    {{-- ── Purchase (mobile: Purchase tile) ──────── --}}
-                    @can('purchase.index')
-                    <li class="{{ request()->routeIs('purchase.*') ? 'active' : '' }}">
-                        <a class="nav-link" href="{{ route('purchase.index') }}">
-                            <i class="fa fa-shopping-cart" aria-hidden="true"></i>
-                            <span>Purchase</span>
+                    {{-- ── Gate Passes ────────────────────────────── --}}
+                    @can('gate_passes.index')
+                    <li class="{{ request()->routeIs('gate_passes.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('gate_passes.index') }}">
+                            <i class="fa fa-truck-loading" aria-hidden="true"></i>
+                            <span>Gate Passes</span>
                         </a>
                     </li>
                     @endcan
+
+                    {{-- ── Purchase (Invoice / Order / Return) ───── --}}
+                    @if(auth()->user()->canAny(['purchase.index']))
+                    <li class="nav-parent {{ request()->routeIs('purchase_invoices.*', 'purchase_orders.*', 'purchase_returns.*') ? 'nav-expanded active' : '' }}">
+                        <a class="nav-link" href="#">
+                            <i class="fa fa-shopping-cart" aria-hidden="true"></i>
+                            <span>Purchase</span>
+                        </a>
+                        <ul class="nav nav-children">
+                            @can('purchase.index')
+                            <li class="{{ request()->routeIs('purchase_orders.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('purchase_orders.index') }}">Purchase Orders</a>
+                            </li>
+                            <li class="{{ request()->routeIs('purchase_invoices.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('purchase_invoices.index') }}">Purchase Invoices</a>
+                            </li>
+                            <li class="{{ request()->routeIs('purchase_returns.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('purchase_returns.index') }}">Purchase Returns</a>
+                            </li>
+                            @endcan
+                        </ul>
+                    </li>
+                    @endif
 
                     {{-- ── Jobs + Job Receives (mobile: Jobs / Receives tiles) ── --}}
                     @if(auth()->user()->canAny(['jobs.index', 'job_receives.index']))
@@ -188,7 +211,9 @@
                     </li>
                     @endif
 
-                    {{-- ── Sale (mobile: Sale tile) ──────────────── --}}
+                    {{-- ── Sale (Order / Invoice / Return) ───────── --}}
+                    {{-- NOT YET BUILT — SaleController is a placeholder only.
+                         Uncomment once the Sale module (Order/Invoice/Return) ships.
                     @can('sale.index')
                     <li class="{{ request()->routeIs('sale.*') ? 'active' : '' }}">
                         <a class="nav-link" href="{{ route('sale.index') }}">
@@ -197,8 +222,9 @@
                         </a>
                     </li>
                     @endcan
+                    --}}
 
-                    {{-- ── Vouchers (mobile: Payments tile — Payment voucher type) ── --}}
+                    {{-- ── Vouchers (mobile: Payments tile) ──────── --}}
                     @can('vouchers.index')
                     <li class="nav-parent {{ request()->routeIs('vouchers.*') ? 'nav-expanded active' : '' }}">
                         <a class="nav-link" href="#">
@@ -216,6 +242,8 @@
                     @endcan
 
                     {{-- ── Expenses (mobile: Expenses tile) ──────── --}}
+                    {{-- NOT YET BUILT — model/migration exist, ExpenseController not implemented.
+                         Uncomment once built.
                     @can('expenses.index')
                     <li class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
                         <a class="nav-link" href="{{ route('expenses.index') }}">
@@ -224,8 +252,13 @@
                         </a>
                     </li>
                     @endcan
+                    --}}
 
                     {{-- ── Reports (mobile: Reports + Party Ledger tiles) ── --}}
+                    {{-- NOT YET BUILT — InventoryReportController, PurchaseReportController,
+                         SalesReportController, AccountsReportController are all referenced
+                         in routes but not implemented yet. Uncomment once the Reports
+                         module ships.
                     @php
                         $reportPerms = [
                             'reports.inventory', 'reports.purchase', 'reports.sales',
@@ -293,6 +326,7 @@
                         </ul>
                     </li>
                     @endif
+                    --}}
 
                 </ul>
             </nav>
