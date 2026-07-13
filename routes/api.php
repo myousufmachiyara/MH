@@ -2,7 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthApiController;
-use App\Http\Controllers\Api\ChartOfAccountApiController;   // MISSING — add
+use App\Http\Controllers\Api\ChartOfAccountApiController;
+use App\Http\Controllers\Api\AccountMappingApiController;
 use App\Http\Controllers\Api\VendorApiController;
 use App\Http\Controllers\Api\CustomerApiController;
 
@@ -13,8 +14,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', [AuthApiController::class, 'logout']);
     Route::post('change-password', [AuthApiController::class, 'changePassword']);
 
-    Route::get('chart-of-accounts', [ChartOfAccountApiController::class, 'index'])->middleware('check.permission:coa.view');
-    Route::get('account-mappings', [AccountMappingApiController::class, 'index'])->middleware('check.permission:coa.view');
+    Route::get('chart-of-accounts', [ChartOfAccountApiController::class, 'index'])
+        ->middleware('check.permission:coa.index');
+
+    Route::get('account-mappings', [AccountMappingApiController::class, 'index'])
+        ->middleware('check.permission:coa.index');
 
     Route::get('vendors',        [VendorApiController::class, 'index'])   ->middleware('check.permission:vendors.index');
     Route::get('vendors/search', [VendorApiController::class, 'search'])  ->middleware('check.permission:vendors.index');
@@ -29,6 +33,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('customers',       [CustomerApiController::class, 'store'])   ->middleware('check.permission:customers.create');
     Route::put('customers/{id}',   [CustomerApiController::class, 'update'])  ->middleware('check.permission:customers.edit');
     Route::delete('customers/{id}',[CustomerApiController::class, 'destroy']) ->middleware('check.permission:customers.delete');
-    
 });
-
