@@ -279,6 +279,8 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('job-receives')->name('job_receives.')->group(function () {
         Route::get('/',                        [JobOrderReceiveController::class, 'index'])       ->name('index')      ->middleware('check.permission:job_receives.index');
         Route::get('create',                   [JobOrderReceiveController::class, 'create'])      ->name('create')     ->middleware('check.permission:job_receives.create');
+        Route::get('{id}/edit', [JobOrderReceiveController::class, 'edit'])->name('edit')->middleware('check.permission:job_receives.edit');
+        Route::put('{id}', [JobOrderReceiveController::class, 'update'])->name('update')->middleware('check.permission:job_receives.edit');
         Route::get('outstanding/{jobOrderId}', [JobOrderReceiveController::class, 'outstanding'])  ->name('outstanding')->middleware('check.permission:job_receives.index');
         Route::post('/',                        [JobOrderReceiveController::class, 'store'])       ->name('store')      ->middleware('check.permission:job_receives.create');
         Route::get('{id}',                      [JobOrderReceiveController::class, 'show'])         ->name('show')       ->middleware('check.permission:job_receives.index');

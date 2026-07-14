@@ -13,6 +13,17 @@
         </header>
 
         <div class="card-body">
+
+          @if($errors->any())
+            <div class="alert alert-danger">
+              <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                  <li>{{ $error }}</li>
+                @endforeach
+              </ul>
+            </div>
+          @endif
+
           <div class="row">
             <div class="col-md-4 mb-3">
               <label>Job Order <span class="text-danger">*</span></label>
@@ -53,19 +64,23 @@
           </div>
 
           <div class="table-responsive mb-3" id="itemsSection" style="display:none">
-            <table class="table table-bordered">
+            <table class="table table-bordered" id="itemsTable">
               <thead>
                 <tr>
                   <th>Raw Product</th>
-                  <th>Outstanding (Issued)</th>
+                  <th>Outstanding</th>
                   <th>Qty Consumed</th>
                   <th>Leftover (auto)</th>
                   <th>Output Product</th>
                   <th>Output Quantity</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="itemsBody"></tbody>
             </table>
+            <button type="button" class="btn btn-outline-primary" id="addRowBtn">
+              <i class="fas fa-plus"></i> Add Another Item
+            </button>
           </div>
         </div>
 
@@ -78,7 +93,9 @@
 </div>
 
 <script>
-  const productOptions = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name]));
+  const outputProducts = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name]));
+  let outstandingItems = []; // current job order's outstanding raw products
+  let rowIndex = 0;
 
   $(document).ready(function () {
     $('.select2-js').select2({ width: '100%' });
@@ -86,6 +103,9 @@
 
   $('#job_order_select').on('change', function () {
     const jobId = $(this).val();
+    $('#itemsBody').empty();
+    rowIndex = 0;
+
     if (!jobId) {
       $('#itemsSection').hide();
       $('#loadingMsg').show().text('Select a job order to see outstanding raw material.');
@@ -97,6 +117,8 @@
     fetch(`/job-receives/outstanding/${jobId}`)
       .then(res => res.json())
       .then(data => {
+        outstandingItems = data;
+
         if (data.length === 0) {
           $('#itemsSection').hide();
           $('#loadingMsg').show().text('No outstanding raw material for this job order — it may already be fully received.');
@@ -104,44 +126,92 @@
         }
 
         $('#loadingMsg').hide();
-        const tbody = $('#itemsBody');
-        tbody.empty();
-
-        const outputOptionsHtml = '<option value="">— None —</option>' +
-          productOptions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-
-        data.forEach((item, idx) => {
-          tbody.append(`
-            <tr>
-              <td>
-                ${item.product_name}
-                <input type="hidden" name="items[${idx}][raw_product_id]" value="${item.product_id}">
-              </td>
-              <td>${item.outstanding}</td>
-              <td><input type="number" name="items[${idx}][quantity_consumed]" class="form-control consumed-input"
-                    value="0" step="any" min="0" max="${item.outstanding}"
-                    data-outstanding="${item.outstanding}" onchange="calcLeftover(this)"></td>
-              <td class="leftover-cell">${item.outstanding}</td>
-              <td>
-                <select name="items[${idx}][output_product_id]" class="form-control select2-js">
-                  ${outputOptionsHtml}
-                </select>
-              </td>
-              <td><input type="number" name="items[${idx}][quantity_output]" class="form-control" value="0" step="any" min="0"></td>
-            </tr>
-          `);
-        });
-
         $('#itemsSection').show();
-        $('.select2-js').select2({ width: '100%' });
+
+        // Pre-add one row per outstanding product, same as before,
+        // but now the row itself is a normal free-form row (product
+        // is selectable/changeable, and more rows can be added).
+        data.forEach(item => addRow(item.product_id, item.outstanding));
       });
   });
 
-  function calcLeftover(input) {
-    const outstanding = parseFloat($(input).data('outstanding')) || 0;
-    const consumed = parseFloat($(input).val()) || 0;
-    const leftover = Math.max(0, outstanding - consumed);
-    $(input).closest('tr').find('.leftover-cell').text(leftover.toFixed(3));
+  function rawProductOptionsHtml(selectedId) {
+    let html = '<option value="">Select Product</option>';
+    outstandingItems.forEach(item => {
+      const sel = item.product_id == selectedId ? 'selected' : '';
+      html += `<option value="${item.product_id}" data-outstanding="${item.outstanding}" ${sel}>
+                 ${item.product_name} (outstanding: ${item.outstanding})
+               </option>`;
+    });
+    return html;
   }
+
+  function outputProductOptionsHtml() {
+    let html = '<option value="">— None —</option>';
+    outputProducts.forEach(p => {
+      html += `<option value="${p.id}">${p.name}</option>`;
+    });
+    return html;
+  }
+
+  function addRow(preselectProductId = null, preselectOutstanding = null) {
+    const idx = rowIndex++;
+
+    const row = $(`
+      <tr class="item-row">
+        <td>
+          <select name="items[${idx}][raw_product_id]" class="form-control select2-js raw-product-select" required>
+            ${rawProductOptionsHtml(preselectProductId)}
+          </select>
+        </td>
+        <td class="outstanding-cell">${preselectOutstanding ?? '—'}</td>
+        <td>
+          <input type="number" name="items[${idx}][quantity_consumed]" class="form-control consumed-input"
+                 value="0" step="any" min="0" max="${preselectOutstanding ?? ''}"
+                 data-outstanding="${preselectOutstanding ?? 0}">
+        </td>
+        <td class="leftover-cell">${preselectOutstanding ?? 0}</td>
+        <td>
+          <select name="items[${idx}][output_product_id]" class="form-control select2-js">
+            ${outputProductOptionsHtml()}
+          </select>
+        </td>
+        <td>
+          <input type="number" name="items[${idx}][quantity_output]" class="form-control" value="0" step="any" min="0">
+        </td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
+      </tr>
+    `);
+
+    $('#itemsBody').append(row);
+    row.find('.select2-js').select2({ width: '100%' });
+  }
+
+  $('#addRowBtn').on('click', function () {
+    addRow();
+  });
+
+  $(document).on('change', '.raw-product-select', function () {
+    const selected = $(this).find('option:selected');
+    const outstanding = parseFloat(selected.data('outstanding')) || 0;
+    const row = $(this).closest('tr');
+
+    row.find('.outstanding-cell').text(outstanding || '—');
+    row.find('.consumed-input').attr('max', outstanding).attr('data-outstanding', outstanding);
+    row.find('.leftover-cell').text(outstanding.toFixed(3));
+  });
+
+  $(document).on('input', '.consumed-input', function () {
+    const outstanding = parseFloat($(this).data('outstanding')) || 0;
+    const consumed = parseFloat($(this).val()) || 0;
+    const leftover = Math.max(0, outstanding - consumed);
+    $(this).closest('tr').find('.leftover-cell').text(leftover.toFixed(3));
+  });
+
+  $(document).on('click', '.remove-row', function () {
+    if ($('.item-row').length > 1) {
+      $(this).closest('tr').remove();
+    }
+  });
 </script>
 @endsection

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\JobOrder;
 use App\Models\JobOrderReceive;
 use App\Models\VendorStockLedger;
+use App\Models\Product;
 use App\Services\JobOrderReceiveService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -30,12 +31,13 @@ class JobOrderReceiveController extends Controller
             ->orderByDesc('issue_date')
             ->get();
 
-        $products = \App\Models\Product::active()->orderBy('name')->get();
+        $products = Product::active()->orderBy('name')->get();
 
         return view('job_receives.create', compact('jobOrders', 'products'));
     }
 
-    // AJAX: outstanding (still-issued) raw quantities for a job order
+    // AJAX: outstanding (still-issued) raw quantities for a job order —
+    // used to populate the product dropdown + show available qty per row
     public function outstanding($jobOrderId)
     {
         $jobOrder = JobOrder::with('vendor')->findOrFail($jobOrderId);
@@ -62,7 +64,7 @@ class JobOrderReceiveController extends Controller
         foreach ($issued as $productId => $row) {
             $stillOutstanding = (float) $row->issued_qty + (float) ($received[$productId]->received_qty ?? 0);
             if ($stillOutstanding > 0.001) {
-                $product = \App\Models\Product::find($productId);
+                $product = Product::find($productId);
                 $outstanding[] = [
                     'product_id'   => $productId,
                     'product_name' => $product?->name,
@@ -76,17 +78,36 @@ class JobOrderReceiveController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'job_order_id'                       => 'required|exists:job_orders,id',
-            'receive_date'                        => 'required|date',
-            'processing_charge'                   => 'nullable|numeric|min:0',
-            'remarks'                             => 'nullable|string',
-            'items'                                => 'required|array|min:1',
-            'items.*.raw_product_id'              => 'required|exists:products,id',
-            'items.*.quantity_consumed'           => 'required|numeric|min:0',
-            'items.*.output_product_id'           => 'nullable|exists:products,id',
-            'items.*.quantity_output'             => 'nullable|numeric|min:0',
+        $validated = $request->validate([
+            'job_order_id'                => 'required|exists:job_orders,id',
+            'receive_date'                => 'required|date',
+            'processing_charge'           => 'nullable|numeric|min:0',
+            'remarks'                     => 'nullable|string',
+            'items'                       => 'required|array|min:1',
+            'items.*.raw_product_id'      => 'required|integer|exists:products,id',
+            'items.*.quantity_consumed'   => 'required|numeric|min:0',
+            'items.*.output_product_id'   => 'nullable|integer|exists:products,id',
+            'items.*.quantity_output'     => 'nullable|numeric|min:0',
         ]);
+
+        // Re-index items to plain sequential array (0,1,2,...) — protects
+        // against gaps in the submitted indices (e.g. a removed row on the
+        // client leaving items[0], items[2] with items[1] missing), which
+        // otherwise can produce unexpected iteration behavior downstream.
+        $items = array_values($validated['items']);
+
+        // Drop any row where nothing was actually entered (safety net —
+        // the JS should already prevent this, but don't trust the client).
+        $items = array_values(array_filter($items, function ($item) {
+            return !empty($item['raw_product_id'])
+                && ((float) ($item['quantity_consumed'] ?? 0) > 0
+                    || (float) ($item['quantity_output'] ?? 0) > 0);
+        }));
+
+        if (empty($items)) {
+            return back()->withInput()
+                ->with('error', 'Enter at least one item with a quantity consumed or output.');
+        }
 
         try {
             $attachments = [];
@@ -97,24 +118,90 @@ class JobOrderReceiveController extends Controller
             }
 
             $receive = $this->service->create([
-                'job_order_id'       => $request->job_order_id,
-                'receive_date'       => $request->receive_date,
-                'processing_charge'  => $request->processing_charge ?? 0,
-                'remarks'            => $request->remarks,
-                'attachments'        => $attachments ?: null,
-            ], $request->items, auth()->id());
+                'job_order_id'      => $validated['job_order_id'],
+                'receive_date'      => $validated['receive_date'],
+                'processing_charge' => $validated['processing_charge'] ?? 0,
+                'remarks'           => $validated['remarks'] ?? null,
+                'attachments'       => $attachments ?: null,
+            ], $items, auth()->id());
 
-            Log::info('[JobOrderReceive] Created', ['id' => $receive->id, 'by' => auth()->id()]);
+            Log::info('[JobOrderReceive] Created', [
+                'id' => $receive->id,
+                'items_count' => count($items),
+                'by' => auth()->id(),
+            ]);
 
             return redirect()->route('job_receives.index')
                 ->with('success', 'Job receive ' . $receive->receive_no . ' recorded successfully.');
 
         } catch (\Exception $e) {
-            Log::error('[JobOrderReceive] Store failed', ['message' => $e->getMessage()]);
+            Log::error('[JobOrderReceive] Store failed', [
+                'message' => $e->getMessage(),
+                'items'   => $items,
+            ]);
             return back()->withInput()->with('error', $e->getMessage());
         }
     }
+    public function edit($id)
+    {
+        $receive = JobOrderReceive::with('items.rawProduct', 'items.outputProduct', 'jobOrder.vendor')
+            ->findOrFail($id);
 
+        $products = Product::active()->orderBy('name')->get();
+
+        return view('job_receives.edit', compact('receive', 'products'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'receive_date'                => 'required|date',
+            'processing_charge'           => 'nullable|numeric|min:0',
+            'remarks'                     => 'nullable|string',
+            'items'                       => 'required|array|min:1',
+            'items.*.raw_product_id'      => 'required|integer|exists:products,id',
+            'items.*.quantity_consumed'   => 'required|numeric|min:0',
+            'items.*.output_product_id'   => 'nullable|integer|exists:products,id',
+            'items.*.quantity_output'     => 'nullable|numeric|min:0',
+        ]);
+
+        $items = array_values(array_filter($validated['items'], function ($item) {
+            return !empty($item['raw_product_id'])
+                && ((float) ($item['quantity_consumed'] ?? 0) > 0 || (float) ($item['quantity_output'] ?? 0) > 0);
+        }));
+
+        if (empty($items)) {
+            return back()->withInput()->with('error', 'Enter at least one item.');
+        }
+
+        try {
+            $receive = JobOrderReceive::findOrFail($id);
+
+            $attachments = $receive->attachments ?? [];
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $attachments[] = $file->store('job_receive_attachments', 'public');
+                }
+            }
+
+            $this->service->update($receive, [
+                'receive_date'      => $validated['receive_date'],
+                'processing_charge' => $validated['processing_charge'] ?? 0,
+                'remarks'           => $validated['remarks'] ?? null,
+                'attachments'       => $attachments ?: null,
+            ], $items, auth()->id());
+
+            Log::info('[JobOrderReceive] Updated', ['id' => $id, 'by' => auth()->id()]);
+
+            return redirect()->route('job_receives.index')
+                ->with('success', 'Job receive updated successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('[JobOrderReceive] Update failed', ['id' => $id, 'message' => $e->getMessage()]);
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+    
     public function show($id)
     {
         $receive = JobOrderReceive::with('items.rawProduct', 'items.outputProduct', 'jobOrder.vendor')
