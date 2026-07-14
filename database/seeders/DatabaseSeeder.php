@@ -40,11 +40,6 @@ class DatabaseSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────
 
         $superAdminRole = Role::firstOrCreate(['name' => 'superadmin']);
-        $adminRole      = Role::firstOrCreate(['name' => 'admin']);
-        $managerRole    = Role::firstOrCreate(['name' => 'manager']);
-        $accountantRole = Role::firstOrCreate(['name' => 'accountant']);
-        $operatorRole   = Role::firstOrCreate(['name' => 'operator']);
-        $viewerRole     = Role::firstOrCreate(['name' => 'viewer']);
 
         $farhan->assignRole($superAdminRole);
         $yousuf->assignRole($superAdminRole);
