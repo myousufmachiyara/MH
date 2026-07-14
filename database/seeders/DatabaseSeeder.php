@@ -119,7 +119,6 @@ class DatabaseSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────
 
         $superAdminRole->syncPermissions(Permission::all());
-        $adminRole->syncPermissions(Permission::all());
 
         // ─────────────────────────────────────────────────────────────────
         // HEADS OF ACCOUNTS
