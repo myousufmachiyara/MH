@@ -76,9 +76,10 @@ class Product extends Model
 
     // Weighted Average Cost — computed from actual purchases, not stored.
     // WAC = total value received / total quantity received
+    // Weighted Average Cost — computed from actual purchases, not stored.
     public function getWeightedAverageCostAttribute(): float
     {
-        $totals = $this->stockMovements()
+        $totals = \App\Models\WarehouseStockMovement::where('product_id', $this->id)
             ->where('movement_type', 'Purchase')
             ->selectRaw('COALESCE(SUM(amount),0) as total_value, COALESCE(SUM(quantity),0) as total_qty')
             ->first();
@@ -94,7 +95,7 @@ class Product extends Model
     // Current stock on hand — opening + all movements (in - out)
     public function getCurrentStockAttribute(): float
     {
-        $net = $this->stockMovements()
+        $net = \App\Models\WarehouseStockMovement::where('product_id', $this->id)
             ->selectRaw('COALESCE(SUM(quantity),0) as net')
             ->value('net');
 
