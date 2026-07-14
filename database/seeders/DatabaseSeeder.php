@@ -39,11 +39,6 @@ class DatabaseSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────
 
         $superAdminRole = Role::firstOrCreate(['name' => 'superadmin']);
-        $adminRole      = Role::firstOrCreate(['name' => 'admin']);
-        $managerRole    = Role::firstOrCreate(['name' => 'manager']);
-        $accountantRole = Role::firstOrCreate(['name' => 'accountant']);
-        $operatorRole   = Role::firstOrCreate(['name' => 'operator']);
-        $viewerRole     = Role::firstOrCreate(['name' => 'viewer']);
 
         $farhan->assignRole($superAdminRole);
         $yousuf->assignRole($adminRole);
@@ -123,43 +118,6 @@ class DatabaseSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────
 
         $superAdminRole->syncPermissions(Permission::all());
-        $adminRole->syncPermissions(Permission::all());
-
-        $managerRole->syncPermissions(
-            Permission::whereNotIn('name', [
-                'user_roles.create', 'user_roles.edit', 'user_roles.delete',
-                'users.delete', 'coa.delete', 'shoa.delete',
-            ])->get()
-        );
-
-        $accountantRole->syncPermissions(
-            Permission::where(function ($q) {
-                $q->where('name', 'like', 'vouchers.%')
-                  ->orWhere('name', 'like', 'expenses.%')
-                  ->orWhere('name', 'like', 'purchase.%')
-                  ->orWhere('name', 'like', 'sale.%')
-                  ->orWhere('name', 'like', 'reports.accounts%')
-                  ->orWhereIn('name', ['reports.purchase', 'reports.sales']);
-            })->get()
-        );
-
-        $operatorRole->syncPermissions(
-            Permission::where(function ($q) {
-                $q->where('name', 'like', 'orders.%')
-                  ->orWhere('name', 'like', 'gate_passes.%')
-                  ->orWhere('name', 'like', 'jobs.%')
-                  ->orWhere('name', 'like', 'job_receives.%')
-                  ->orWhere('name', 'like', 'purchase.%')
-                  ->orWhereIn('name', ['reports.inventory']);
-            })->get()
-        );
-
-        $viewerRole->syncPermissions(
-            Permission::where(function ($q) {
-                $q->where('name', 'like', '%.index')
-                  ->orWhere('name', 'like', '%.print');
-            })->get()
-        );
 
         // ─────────────────────────────────────────────────────────────────
         // HEADS OF ACCOUNTS
