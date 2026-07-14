@@ -39,6 +39,11 @@ class DatabaseSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────
 
         $superAdminRole = Role::firstOrCreate(['name' => 'superadmin']);
+        $adminRole      = Role::firstOrCreate(['name' => 'admin']);
+        $managerRole    = Role::firstOrCreate(['name' => 'manager']);
+        $accountantRole = Role::firstOrCreate(['name' => 'accountant']);
+        $operatorRole   = Role::firstOrCreate(['name' => 'operator']);
+        $viewerRole     = Role::firstOrCreate(['name' => 'viewer']);
 
         $farhan->assignRole($superAdminRole);
         $yousuf->assignRole($superAdminRole);
@@ -71,7 +76,7 @@ class DatabaseSeeder extends Seeder
 
             // Product master
             'products', 'product_categories', 'product_subcategories',
-            'attributes', 'measurement_units',
+            'attributes', 'measurement_units', 'job_types',
 
             // Parties — separated tables, separate permissions
             'customers', 'vendors',
@@ -118,6 +123,43 @@ class DatabaseSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────
 
         $superAdminRole->syncPermissions(Permission::all());
+        $adminRole->syncPermissions(Permission::all());
+
+        $managerRole->syncPermissions(
+            Permission::whereNotIn('name', [
+                'user_roles.create', 'user_roles.edit', 'user_roles.delete',
+                'users.delete', 'coa.delete', 'shoa.delete',
+            ])->get()
+        );
+
+        $accountantRole->syncPermissions(
+            Permission::where(function ($q) {
+                $q->where('name', 'like', 'vouchers.%')
+                  ->orWhere('name', 'like', 'expenses.%')
+                  ->orWhere('name', 'like', 'purchase.%')
+                  ->orWhere('name', 'like', 'sale.%')
+                  ->orWhere('name', 'like', 'reports.accounts%')
+                  ->orWhereIn('name', ['reports.purchase', 'reports.sales']);
+            })->get()
+        );
+
+        $operatorRole->syncPermissions(
+            Permission::where(function ($q) {
+                $q->where('name', 'like', 'orders.%')
+                  ->orWhere('name', 'like', 'gate_passes.%')
+                  ->orWhere('name', 'like', 'jobs.%')
+                  ->orWhere('name', 'like', 'job_receives.%')
+                  ->orWhere('name', 'like', 'purchase.%')
+                  ->orWhereIn('name', ['reports.inventory']);
+            })->get()
+        );
+
+        $viewerRole->syncPermissions(
+            Permission::where(function ($q) {
+                $q->where('name', 'like', '%.index')
+                  ->orWhere('name', 'like', '%.print');
+            })->get()
+        );
 
         // ─────────────────────────────────────────────────────────────────
         // HEADS OF ACCOUNTS
@@ -158,10 +200,6 @@ class DatabaseSeeder extends Seeder
 
         // ─────────────────────────────────────────────────────────────────
         // CHART OF ACCOUNTS
-        // Business/financial/inventory accounts ONLY.
-        // NO customer/vendor accounts — parties are separated (own tables).
-        // AR (id 3) and AP (id 8) are control accounts; party balances
-        // come from voucher_entries.party_id once the voucher engine posts.
         // ─────────────────────────────────────────────────────────────────
 
         $coaBase = [
@@ -211,16 +249,21 @@ class DatabaseSeeder extends Seeder
             [30, '508001', 17, 'Sample Production Expense',           'sampling'],
             [31, '508002', 17, 'Sample Courier & Dispatch Expense',   'sampling'],
             [32, '509001', 18, 'Packaging Material Expense',          'packaging'],
+            // ── Additional (Tax accounts) ──────────────────────────────
+            [33, '201003',  5, 'Sales Tax Payable',                   'liability'],
+            [34, '104005',  4, 'Purchase Tax (Input Tax)',            'inventory'],
         ];
 
         foreach ($coaRows as [$id, $code, $shoa, $name, $type]) {
-            ChartOfAccounts::create(array_merge($coaBase, [
-                'id'           => $id,
-                'account_code' => $code,
-                'shoa_id'      => $shoa,
-                'name'         => $name,
-                'account_type' => $type,
-            ]));
+            ChartOfAccounts::firstOrCreate(
+                ['id' => $id],
+                array_merge($coaBase, [
+                    'account_code' => $code,
+                    'shoa_id'      => $shoa,
+                    'name'         => $name,
+                    'account_type' => $type,
+                ])
+            );
         }
 
         // ─────────────────────────────────────────────────────────────────
@@ -240,10 +283,23 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // ─────────────────────────────────────────────────────────────────
+        // JOB TYPES — each maps to its service-cost COA account
+        // ─────────────────────────────────────────────────────────────────
+
+        DB::table('job_types')->insertOrIgnore([
+            ['id' => 1, 'name' => 'Weaving',               'service_cost_account_id' => 24, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 2, 'name' => 'Processing / Printing', 'service_cost_account_id' => 25, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 3, 'name' => 'Dyeing',                'service_cost_account_id' => 26, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 4, 'name' => 'Finishing',             'service_cost_account_id' => 27, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 5, 'name' => 'Packaging',             'service_cost_account_id' => 28, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 6, 'name' => 'Other',                 'service_cost_account_id' => 29, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now],
+        ]);
+
+        // ─────────────────────────────────────────────────────────────────
         // DUMMY VENDORS (separated table — no coa_id)
         // ─────────────────────────────────────────────────────────────────
 
-        DB::table('vendors')->insert([
+        DB::table('vendors')->insertOrIgnore([
             ['id' =>  1, 'name' => 'Al-Noor Spinning Mills',  'vendor_type' => 'spinning_mill',   'opening_balance' => 0, 'opening_type' => 'payable', 'is_active' => 1, 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
             ['id' =>  2, 'name' => 'Crescent Weaving Mills',  'vendor_type' => 'weaving_mill',    'opening_balance' => 0, 'opening_type' => 'payable', 'is_active' => 1, 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
             ['id' =>  3, 'name' => 'Royal Processing House',  'vendor_type' => 'processing_mill', 'opening_balance' => 0, 'opening_type' => 'payable', 'is_active' => 1, 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => $now, 'updated_at' => $now],
@@ -260,7 +316,7 @@ class DatabaseSeeder extends Seeder
         // DUMMY CUSTOMER (separated table — no coa_id)
         // ─────────────────────────────────────────────────────────────────
 
-        DB::table('customers')->insert([
+        DB::table('customers')->insertOrIgnore([
             'id'              => 1,
             'name'            => 'ABC Customer',
             'opening_balance' => 0.00,
@@ -276,17 +332,20 @@ class DatabaseSeeder extends Seeder
         // PRODUCT CATEGORY & PRODUCT
         // ─────────────────────────────────────────────────────────────────
 
-        DB::table('product_categories')->insert([
+        DB::table('product_categories')->insertOrIgnore([
             'id' => 1, 'name' => 'Yarn', 'code' => 'yarn',
             'created_at' => $now, 'updated_at' => $now,
         ]);
 
-        DB::table('product_categories')->insert([
-            'id' => 2, 'name' => 'Greige', 'code' => 'greige',
-            'created_at' => $now, 'updated_at' => $now,
-        ]);
+        // Attach stock/COGS accounts to the Yarn category
+        DB::table('product_categories')
+            ->where('id', 1)
+            ->update([
+                'stock_account_id' => 4,  // Stock in Hand — Yarn
+                'cogs_account_id'  => 17, // Cost of Goods Sold
+            ]);
 
-        DB::table('products')->insert([
+        DB::table('products')->insertOrIgnore([
             'id'               => 1,
             'category_id'      => 1,
             'subcategory_id'   => null,
@@ -296,21 +355,6 @@ class DatabaseSeeder extends Seeder
             'opening_stock'    => 0.00,
             'selling_price'    => 0.00,
             'measurement_unit' => 6, // lbs
-            'is_active'        => 1,
-            'track_lots'       => 0,
-            'created_at'       => $now,
-            'updated_at'       => $now,
-        ]);
-        DB::table('products')->insert([
-            'id'               => 2,
-            'category_id'      => 2,
-            'subcategory_id'   => null,
-            'name'             => 'greige-0002',
-            'sku'              => 'Greige-0002',
-            'description'      => null,
-            'opening_stock'    => 0.00,
-            'selling_price'    => 0.00,
-            'measurement_unit' => 2, // lbs
             'is_active'        => 1,
             'track_lots'       => 0,
             'created_at'       => $now,
