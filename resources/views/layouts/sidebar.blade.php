@@ -189,9 +189,9 @@
                     </li>
                     @endif
 
-                    {{-- ── Jobs + Job Receives (mobile: Jobs / Receives tiles) ── --}}
-                    @if(auth()->user()->canAny(['jobs.index', 'job_receives.index']))
-                    <li class="nav-parent {{ request()->routeIs('jobs.*', 'job_receives.*') ? 'nav-expanded active' : '' }}">
+                    {{-- ── Jobs + Job Receives + Job Types (mobile: Jobs / Receives tiles) ── --}}
+                    @if(auth()->user()->canAny(['jobs.index', 'job_receives.index', 'job_types.index']))
+                    <li class="nav-parent {{ request()->routeIs('jobs.*', 'job_receives.*', 'job_types.*') ? 'nav-expanded active' : '' }}">
                         <a class="nav-link" href="#">
                             <i class="fa fa-briefcase" aria-hidden="true"></i>
                             <span>Jobs</span>
@@ -205,6 +205,11 @@
                             @can('job_receives.index')
                             <li class="{{ request()->routeIs('job_receives.*') ? 'active' : '' }}">
                                 <a class="nav-link" href="{{ route('job_receives.index') }}">Job Receives</a>
+                            </li>
+                            @endcan
+                            @can('job_types.index')
+                            <li class="{{ request()->routeIs('job_types.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('job_types.index') }}">Job Types</a>
                             </li>
                             @endcan
                         </ul>
