@@ -10,6 +10,7 @@ use App\Models\HeadOfAccounts;
 use App\Models\SubHeadOfAccounts;
 use App\Models\ChartOfAccounts;
 use App\Models\MeasurementUnit;
+use App\Models\AccountMapping;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -267,6 +268,35 @@ class DatabaseSeeder extends Seeder
         }
 
         // ─────────────────────────────────────────────────────────────────
+        // ACCOUNT MAPPINGS — pre-mapped to the seeded COA accounts.
+        // stock_in_hand / processing_charges act as FALLBACKS only —
+        // Purchase/Job Receive prefer the per-category / per-job-type
+        // account when the product's category or job's type has one set;
+        // these two roles are used only when that's not configured.
+        // Editable anytime from Chart of Accounts → Account Mappings.
+        // ─────────────────────────────────────────────────────────────────
+
+        $mappingDefaults = [
+            'accounts_receivable' => 3,  // Accounts Receivable — Control
+            'accounts_payable'    => 8,  // Accounts Payable — Control
+            'sales_revenue'       => 14, // Sales Revenue — Fabric
+            'sales_tax_payable'   => 33, // Sales Tax Payable
+            'purchase_tax'        => 34, // Purchase Tax (Input Tax)
+            'stock_in_hand'       => 4,  // Stock in Hand — Yarn (fallback)
+            'cogs'                => 17, // Cost of Goods Sold
+            'cash'                => 1,  // Cash in Hand
+            'bank'                => 2,  // Main Bank Account
+            'processing_charges'  => 29, // Other Service Cost (fallback)
+        ];
+
+        foreach ($mappingDefaults as $roleKey => $accountId) {
+            AccountMapping::updateOrCreate(
+                ['role_key' => $roleKey],
+                ['account_id' => $accountId]
+            );
+        }
+
+        // ─────────────────────────────────────────────────────────────────
         // MEASUREMENT UNITS
         // ─────────────────────────────────────────────────────────────────
 
@@ -329,36 +359,60 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // ─────────────────────────────────────────────────────────────────
-        // PRODUCT CATEGORY & PRODUCT
+        // PRODUCT CATEGORIES — Yarn + Greige, each linked to its own
+        // stock/COGS account
         // ─────────────────────────────────────────────────────────────────
 
         DB::table('product_categories')->insertOrIgnore([
-            'id' => 1, 'name' => 'Yarn', 'code' => 'yarn',
-            'created_at' => $now, 'updated_at' => $now,
+            ['id' => 1, 'name' => 'Yarn',           'code' => 'yarn',   'created_at' => $now, 'updated_at' => $now],
+            ['id' => 2, 'name' => 'Greige Fabric',  'code' => 'greige', 'created_at' => $now, 'updated_at' => $now],
         ]);
 
-        // Attach stock/COGS accounts to the Yarn category
-        DB::table('product_categories')
-            ->where('id', 1)
-            ->update([
-                'stock_account_id' => 4,  // Stock in Hand — Yarn
-                'cogs_account_id'  => 17, // Cost of Goods Sold
-            ]);
+        DB::table('product_categories')->where('id', 1)->update([
+            'stock_account_id' => 4,  // Stock in Hand — Yarn
+            'cogs_account_id'  => 17, // Cost of Goods Sold
+        ]);
+
+        DB::table('product_categories')->where('id', 2)->update([
+            'stock_account_id' => 5,  // Stock in Hand — Greige Fabric
+            'cogs_account_id'  => 17, // Cost of Goods Sold
+        ]);
+
+        // ─────────────────────────────────────────────────────────────────
+        // PRODUCTS — Yarn-0001 (Yarn category) + Greige-0001 (Greige category)
+        // ─────────────────────────────────────────────────────────────────
 
         DB::table('products')->insertOrIgnore([
-            'id'               => 1,
-            'category_id'      => 1,
-            'subcategory_id'   => null,
-            'name'             => 'yarn-0001',
-            'sku'              => 'YARN-0001',
-            'description'      => null,
-            'opening_stock'    => 0.00,
-            'selling_price'    => 0.00,
-            'measurement_unit' => 6, // lbs
-            'is_active'        => 1,
-            'track_lots'       => 0,
-            'created_at'       => $now,
-            'updated_at'       => $now,
+            [
+                'id'               => 1,
+                'category_id'      => 1,
+                'subcategory_id'   => null,
+                'name'             => 'yarn-0001',
+                'sku'              => 'YARN-0001',
+                'description'      => null,
+                'opening_stock'    => 0.00,
+                'selling_price'    => 0.00,
+                'measurement_unit' => 6, // lbs
+                'is_active'        => 1,
+                'track_lots'       => 0,
+                'created_at'       => $now,
+                'updated_at'       => $now,
+            ],
+            [
+                'id'               => 2,
+                'category_id'      => 2,
+                'subcategory_id'   => null,
+                'name'             => 'greige-0001',
+                'sku'              => 'GREIGE-0001',
+                'description'      => null,
+                'opening_stock'    => 0.00,
+                'selling_price'    => 0.00,
+                'measurement_unit' => 2, // meter
+                'is_active'        => 1,
+                'track_lots'       => 0,
+                'created_at'       => $now,
+                'updated_at'       => $now,
+            ],
         ]);
     }
 }
