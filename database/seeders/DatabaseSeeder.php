@@ -41,7 +41,7 @@ class DatabaseSeeder extends Seeder
         $superAdminRole = Role::firstOrCreate(['name' => 'superadmin']);
 
         $farhan->assignRole($superAdminRole);
-        $yousuf->assignRole($adminRole);
+        $yousuf->assignRole($superAdminRole);
 
         // ─────────────────────────────────────────────────────────────────
         // MODULE PERMISSIONS
