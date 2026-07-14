@@ -254,14 +254,9 @@
                     @endcan
                     --}}
 
-                    {{-- ── Reports (mobile: Reports + Party Ledger tiles) ── --}}
-                    {{-- NOT YET BUILT — InventoryReportController, PurchaseReportController,
-                         SalesReportController, AccountsReportController are all referenced
-                         in routes but not implemented yet. Uncomment once the Reports
-                         module ships.
+                    {{-- ── Reports ── --}}
                     @php
-                        $reportPerms = [
-                            'reports.inventory', 'reports.purchase', 'reports.sales',
+                        $accountsReportPerms = [
                             'reports.accounts_general_ledger', 'reports.accounts_trial_balance',
                             'reports.accounts_profit_loss', 'reports.accounts_balance_sheet',
                             'reports.accounts_receivables', 'reports.accounts_payables',
@@ -269,64 +264,41 @@
                             'reports.accounts_bank_reconciliation',
                         ];
                     @endphp
-                    @if(auth()->user()->canAny($reportPerms))
+                    @if(
+                        auth()->user()->can('reports.inventory') ||
+                        auth()->user()->can('reports.purchase')  ||
+                        auth()->user()->can('reports.sales')     ||
+                        auth()->user()->can('reports.accounts')
+                    )
                     <li class="nav-parent {{ request()->routeIs('reports.*') ? 'nav-expanded active' : '' }}">
-                        <a class="nav-link" href="#">
-                            <i class="fa fa-chart-bar" aria-hidden="true"></i>
-                            <span>Reports</span>
-                        </a>
-                        <ul class="nav nav-children">
-
-                            @can('reports.accounts_party_ledger')
-                            <li class="{{ request()->routeIs('reports.accounts_party_ledger') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('reports.accounts_party_ledger') }}">Party Ledger</a>
-                            </li>
-                            @endcan
-
-                            @can('reports.inventory')
-                            <li class="{{ request()->routeIs('reports.inventory') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('reports.inventory') }}">Inventory</a>
-                            </li>
-                            @endcan
-                            @can('reports.purchase')
-                            <li class="{{ request()->routeIs('reports.purchase') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('reports.purchase') }}">Purchase</a>
-                            </li>
-                            @endcan
-                            @can('reports.sales')
-                            <li class="{{ request()->routeIs('reports.sales') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('reports.sales') }}">Sales</a>
-                            </li>
-                            @endcan
-
-                            @if(auth()->user()->canAny(array_slice($reportPerms, 3)))
-                            <li class="nav-parent {{ request()->routeIs('reports.accounts*') ? 'nav-expanded active' : '' }}">
-                                <a class="nav-link" href="#">Accounting</a>
-                                <ul class="nav nav-children">
-                                    @foreach([
-                                        'reports.accounts_general_ledger'     => 'General Ledger',
-                                        'reports.accounts_trial_balance'      => 'Trial Balance',
-                                        'reports.accounts_profit_loss'        => 'Profit &amp; Loss',
-                                        'reports.accounts_balance_sheet'      => 'Balance Sheet',
-                                        'reports.accounts_receivables'        => 'Receivables',
-                                        'reports.accounts_payables'           => 'Payables',
-                                        'reports.accounts_cash_bank'          => 'Cash &amp; Bank',
-                                        'reports.accounts_bank_reconciliation'=> 'Bank Reconciliation',
-                                    ] as $perm => $label)
-                                    @can($perm)
-                                    <li class="{{ request()->routeIs($perm) ? 'active' : '' }}">
-                                        <a class="nav-link" href="{{ route($perm) }}">{!! $label !!}</a>
-                                    </li>
-                                    @endcan
-                                    @endforeach
-                                </ul>
-                            </li>
-                            @endif
-
-                        </ul>
+                    <a class="nav-link" href="#">
+                        <i class="fa fa-chart-bar"></i>
+                        <span>Reports</span>
+                    </a>
+                    <ul class="nav nav-children">
+                        @can('reports.inventory')
+                        <li class="{{ request()->routeIs('reports.inventory') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('reports.inventory') }}">Inventory</a>
+                        </li>
+                        @endcan
+                        {{-- @can('reports.purchase')
+                        <li class="{{ request()->routeIs('reports.purchase') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('reports.purchase') }}">Purchase</a>
+                        </li>
+                        @endcan
+                        @can('reports.sales')
+                        <li class="{{ request()->routeIs('reports.sales') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('reports.sales') }}">Sales</a>
+                        </li>
+                        @endcan
+                        @can('reports.sales')
+                        <li class="{{ request()->routeIs('reports.accounts') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('reports.accounts') }}">Accounts</a>
+                        </li>
+                        @endcan --}}
+                    </ul>
                     </li>
                     @endif
-                    --}}
 
                 </ul>
             </nav>
