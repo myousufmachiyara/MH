@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\Product;
 use App\Models\WarehouseStockMovement;
 use Illuminate\Support\Facades\DB;
 
@@ -38,7 +39,7 @@ class PurchaseService
             foreach ($items as $item) {
                 $amount = (float) $item['quantity'] * (float) $item['unit_price'];
 
-                $purchaseItem = PurchaseItem::create([
+                PurchaseItem::create([
                     'purchase_id'           => $purchase->id,
                     'product_id'            => $item['product_id'],
                     'product_variation_id'  => $item['product_variation_id'] ?? null,
@@ -47,8 +48,6 @@ class PurchaseService
                     'amount'                => $amount,
                 ]);
 
-                // Stock in — increases the client's own warehouse stock,
-                // records the value (used for weighted-average costing).
                 WarehouseStockMovement::create([
                     'product_id'      => $item['product_id'],
                     'movement_type'   => 'Purchase',
@@ -60,7 +59,7 @@ class PurchaseService
                 ]);
             }
 
-            $this->postVoucher($purchase, $userId);
+            $this->postVoucher($purchase, $items, $userId);
 
             return $purchase->load('items.product', 'vendor');
         });
@@ -70,8 +69,6 @@ class PurchaseService
     {
         return DB::transaction(function () use ($purchase, $data, $items, $userId) {
 
-            // Reverse old stock movements + voucher, then re-create —
-            // simplest way to keep everything consistent on edit.
             WarehouseStockMovement::where('reference_type', 'Purchase')
                 ->where('reference_id', $purchase->id)
                 ->delete();
@@ -117,7 +114,7 @@ class PurchaseService
                 ]);
             }
 
-            $this->postVoucher($purchase, $userId);
+            $this->postVoucher($purchase, $items, $userId);
 
             return $purchase->load('items.product', 'vendor');
         });
@@ -137,19 +134,36 @@ class PurchaseService
         });
     }
 
-    // Dr Stock in Hand / Cr Accounts Payable (tagged to the vendor)
-    private function postVoucher(Purchase $purchase, ?int $userId): void
+    // Dr Stock in Hand (per category, one line each) / Dr Purchase Tax (if any)
+    // / Cr Accounts Payable (tagged to vendor)
+    private function postVoucher(Purchase $purchase, array $items, ?int $userId): void
     {
-        $stockAccountId = $this->mappingService->accountId('stock_in_hand');
-        $apAccountId    = $this->mappingService->accountId('accounts_payable');
+        // Group item amounts by the product's category stock account
+        $productIds = collect($items)->pluck('product_id')->unique();
+        $products = Product::with('category')->whereIn('id', $productIds)->get()->keyBy('id');
 
-        $lines = [
-            [
-                'account_id' => $stockAccountId,
-                'debit'      => $purchase->subtotal,
+        $stockTotalsByAccount = []; // account_id => total amount
+
+        foreach ($items as $item) {
+            $amount = (float) $item['quantity'] * (float) $item['unit_price'];
+            $product = $products->get($item['product_id']);
+            $category = $product?->category;
+
+            $stockAccountId = $category?->stock_account_id
+                ?? $this->fallbackStockAccountId();
+
+            $stockTotalsByAccount[$stockAccountId] =
+                ($stockTotalsByAccount[$stockAccountId] ?? 0) + $amount;
+        }
+
+        $lines = [];
+        foreach ($stockTotalsByAccount as $accountId => $amount) {
+            $lines[] = [
+                'account_id' => $accountId,
+                'debit'      => $amount,
                 'credit'     => 0,
-            ],
-        ];
+            ];
+        }
 
         if ($purchase->tax_amount > 0) {
             $taxAccountId = $this->mappingService->accountId('purchase_tax');
@@ -160,6 +174,7 @@ class PurchaseService
             ];
         }
 
+        $apAccountId = $this->mappingService->accountId('accounts_payable');
         $lines[] = [
             'account_id' => $apAccountId,
             'debit'      => 0,
@@ -177,6 +192,14 @@ class PurchaseService
             $purchase->id,
             $userId
         );
+    }
+
+    // If a product's category has no stock_account_id set, fall back to
+    // the account_mappings 'stock_in_hand' role (keeps old behavior working
+    // for categories that haven't been configured yet).
+    private function fallbackStockAccountId(): int
+    {
+        return $this->mappingService->accountId('stock_in_hand');
     }
 
     private function generatePurchaseNo(): string

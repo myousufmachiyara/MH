@@ -13,18 +13,23 @@ class JobOrderService
     {
         return DB::transaction(function () use ($data, $items, $userId) {
 
-            $jobOrder = JobOrder::create(array_merge($data, [
-                'job_no'     => $this->generateJobNo(),
-                'status'     => 'Issued',
-                'created_by' => $userId,
-                'updated_by' => $userId,
-            ]));
+            $jobOrder = JobOrder::create([
+                'job_no'      => $this->generateJobNo(),
+                'vendor_id'   => $data['vendor_id'],
+                'sale_id'     => $data['sale_id'] ?? null,
+                'job_type_id' => $data['job_type_id'] ?? null,
+                'issue_date'  => $data['issue_date'],
+                'remarks'     => $data['remarks'] ?? null,
+                'status'      => 'Issued',
+                'created_by'  => $userId,
+                'updated_by'  => $userId,
+            ]);
 
             foreach ($items as $item) {
                 $this->issueStock($jobOrder, $item['product_id'], (float) $item['quantity']);
             }
 
-            return $jobOrder->load('items.product', 'vendor');
+            return $jobOrder->load('items.product', 'vendor', 'jobType');
         });
     }
 
@@ -35,7 +40,6 @@ class JobOrderService
                 throw new \Exception('Cannot delete — this job order already has receives recorded.');
             }
 
-            // Reverse the issue: remove the ledger entries this job order created
             VendorStockLedger::where('reference_type', 'JobOrder')
                 ->where('reference_id', $jobOrder->id)
                 ->delete();
@@ -45,8 +49,6 @@ class JobOrderService
         });
     }
 
-    // Draws quantity from Leftover first, then Fresh. Writes the ledger
-    // entries and the job_order_items line.
     private function issueStock(JobOrder $jobOrder, int $productId, float $quantity): void
     {
         $vendorId = $jobOrder->vendor_id;

@@ -15,8 +15,12 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->string('code')->unique();
+            $table->unsignedBigInteger('stock_account_id')->nullable()->after('code');
+            $table->unsignedBigInteger('cogs_account_id')->nullable()->after('stock_account_id');
             $table->softDeletes();
             $table->timestamps();
+            $table->foreign('stock_account_id')->references('id')->on('chart_of_accounts')->onDelete('set null');
+            $table->foreign('cogs_account_id')->references('id')->on('chart_of_accounts')->onDelete('set null');
         });
     }
 

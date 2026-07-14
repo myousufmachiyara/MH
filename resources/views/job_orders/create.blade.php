@@ -26,7 +26,12 @@
 
             <div class="col-md-3 mb-3">
               <label>Job Type</label>
-              <input type="text" name="job_type" class="form-control" placeholder="e.g. Weaving, Dyeing">
+              <select name="job_type_id" class="form-control select2-js">
+                <option value="">— Select —</option>
+                @foreach ($jobTypes as $jt)
+                  <option value="{{ $jt->id }}">{{ $jt->name }}</option>
+                @endforeach
+              </select>
             </div>
 
             <div class="col-md-3 mb-3">

@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('job_no', 30)->unique();
             $table->unsignedBigInteger('vendor_id');
             $table->unsignedBigInteger('sale_id')->nullable(); // optional link to a Sale Order
+            $table->unsignedBigInteger('job_type_id')->nullable();
             $table->string('job_type', 50)->nullable(); // Weaving, Dyeing, Processing...
             $table->string('status', 30)->default('Issued'); // Issued|Received|PartiallyReceived
             $table->date('issue_date');

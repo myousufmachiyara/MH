@@ -23,6 +23,9 @@ class ProductCategory extends Model
         return $this->hasMany(Product::class, 'category_id');
     }
 
+    public function stockAccount() { return $this->belongsTo(ChartOfAccounts::class, 'stock_account_id'); }
+    public function cogsAccount()  { return $this->belongsTo(ChartOfAccounts::class, 'cogs_account_id'); }
+
     // FIX: removed productions() — Production model does not exist in this project.
     // It was left over from another project and would throw a class-not-found error
     // the first time any code eager-loads 'productions' on a category.

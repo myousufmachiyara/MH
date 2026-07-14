@@ -252,7 +252,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{docNo}',  [GatePassController::class, 'destroy']) ->name('destroy')->middleware('check.permission:gate_passes.delete');
         Route::get('{docNo}/print', [GatePassController::class, 'print']) ->name('print')  ->middleware('check.permission:gate_passes.print');
     });
-
+    
+    Route::resource('job-types', JobTypeController::class)->except(['create', 'edit', 'show']);
     // ────────────────────────────────────────────────────────────────
     // JOB ORDERS (job order creation = job issue, per finalized design)
     // ────────────────────────────────────────────────────────────────

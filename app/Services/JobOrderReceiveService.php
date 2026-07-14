@@ -20,7 +20,7 @@ class JobOrderReceiveService
     {
         return DB::transaction(function () use ($data, $items, $userId) {
 
-            $jobOrder = JobOrder::findOrFail($data['job_order_id']);
+            $jobOrder = JobOrder::with('jobType')->findOrFail($data['job_order_id']);
 
             $receive = JobOrderReceive::create(array_merge($data, [
                 'receive_no' => $this->generateReceiveNo(),
@@ -32,7 +32,6 @@ class JobOrderReceiveService
                 $this->processReceiveLine($jobOrder, $receive, $item);
             }
 
-            // Update job order status based on remaining Issued balance
             $this->refreshJobOrderStatus($jobOrder);
 
             if ((float) $data['processing_charge'] > 0) {
@@ -48,8 +47,6 @@ class JobOrderReceiveService
         DB::transaction(function () use ($receive) {
             $jobOrder = $receive->jobOrder;
 
-            // Reverse: remove the ledger entries this receive created
-            // (Issued restored, Leftover removed) and the warehouse stock in.
             VendorStockLedger::where('reference_type', 'JobOrderReceive')
                 ->where('reference_id', $receive->id)
                 ->delete();
@@ -73,7 +70,6 @@ class JobOrderReceiveService
         $rawProductId   = $item['raw_product_id'];
         $consumed       = (float) $item['quantity_consumed'];
 
-        // How much of this raw product is currently Issued to this specific job order?
         $issuedToThisJob = VendorStockLedger::where('vendor_id', $vendorId)
             ->where('product_id', $rawProductId)
             ->where('status', 'issued')
@@ -81,14 +77,13 @@ class JobOrderReceiveService
             ->where('reference_id', $jobOrder->id)
             ->sum('quantity');
 
-        // Net of any prior receives already taken against this job order's issue
         $alreadyReceived = VendorStockLedger::where('vendor_id', $vendorId)
             ->where('product_id', $rawProductId)
             ->where('status', 'issued')
             ->where('reference_type', 'JobOrderReceive')
-            ->sum('quantity'); // these are negative entries reducing issued
+            ->sum('quantity');
 
-        $stillIssued = $issuedToThisJob + $alreadyReceived; // alreadyReceived is negative
+        $stillIssued = $issuedToThisJob + $alreadyReceived;
 
         if ($consumed > $stillIssued) {
             throw new \Exception(
@@ -96,8 +91,7 @@ class JobOrderReceiveService
             );
         }
 
-        $leftover = $stillIssued - $consumed;
-        $leftover = round($leftover, 3);
+        $leftover = round($stillIssued - $consumed, 3);
 
         JobOrderReceiveItem::create([
             'job_order_receive_id' => $receive->id,
@@ -108,8 +102,6 @@ class JobOrderReceiveService
             'quantity_output'      => $item['quantity_output'] ?? 0,
         ]);
 
-        // Remove the full 'stillIssued' amount from Issued (it's all being
-        // accounted for now — either consumed, or moved to Leftover).
         VendorStockLedger::create([
             'vendor_id'      => $vendorId,
             'product_id'     => $rawProductId,
@@ -121,8 +113,6 @@ class JobOrderReceiveService
             'created_by'     => $receive->created_by,
         ]);
 
-        // Whatever wasn't consumed becomes Leftover, sitting at the vendor,
-        // available for a future Job Order.
         if ($leftover > 0) {
             VendorStockLedger::create([
                 'vendor_id'      => $vendorId,
@@ -136,13 +126,12 @@ class JobOrderReceiveService
             ]);
         }
 
-        // Finished/output product arrives at our own warehouse.
         if (!empty($item['output_product_id']) && (float) ($item['quantity_output'] ?? 0) > 0) {
             WarehouseStockMovement::create([
                 'product_id'      => $item['output_product_id'],
                 'movement_type'   => 'JobReceiveOutput',
                 'quantity'        => (float) $item['quantity_output'],
-                'amount'          => 0, // valued via processing charge at voucher level, not per-unit here
+                'amount'          => 0,
                 'reference_type'  => 'JobOrderReceive',
                 'reference_id'    => $receive->id,
                 'movement_date'   => $receive->receive_date,
@@ -150,8 +139,6 @@ class JobOrderReceiveService
         }
     }
 
-    // If nothing remains Issued for this job order across all its raw
-    // products, it's fully Received. Otherwise PartiallyReceived.
     private function refreshJobOrderStatus(JobOrder $jobOrder): void
     {
         $remainingIssued = VendorStockLedger::where('vendor_id', $jobOrder->vendor_id)
@@ -169,11 +156,14 @@ class JobOrderReceiveService
         $jobOrder->update(['status' => $status]);
     }
 
-    // Dr Processing/Service Cost (or Stock) / Cr Accounts Payable, tagged to vendor
+    // Dr Processing/Service Cost (resolved from the job's job_type)
+    // / Cr Accounts Payable, tagged to vendor
     private function postVoucher(JobOrderReceive $receive, JobOrder $jobOrder, ?int $userId): void
     {
-        $processingAccountId = $this->mappingService->accountId('processing_charges');
-        $apAccountId          = $this->mappingService->accountId('accounts_payable');
+        $processingAccountId = $jobOrder->jobType?->service_cost_account_id
+            ?? $this->mappingService->accountId('processing_charges');
+
+        $apAccountId = $this->mappingService->accountId('accounts_payable');
 
         $lines = [
             [
