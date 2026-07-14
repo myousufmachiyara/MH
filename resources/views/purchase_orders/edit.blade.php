@@ -61,10 +61,10 @@
                 <tr>
                   <td class="serial-no">{{ $i + 1 }}</td>
                   <td>
-                    <select name="items[{{ $i }}][item_id]" id="item_name{{ $i + 1 }}" class="form-control select2-js product-select">
+                    <select name="items[{{ $i }}][item_id]" id="item_name{{ $i + 1 }}" class="form-control select2-js product-select" onchange="onItemNameChange(this)">
                       <option value="">Select Item</option>
                       @foreach ($products as $product)
-                        <option value="{{ $product->id }}" @selected($product->id == $item->product_id)>{{ $product->name }}</option>
+                        <option value="{{ $product->id }}" data-unit-id="{{ $product->measurement_unit }}" @selected($product->id == $item->product_id)>{{ $product->name }}</option>
                       @endforeach
                     </select>
                   </td>
@@ -137,9 +137,9 @@
         <tr>
           <td class="serial-no"></td>
           <td>
-            <select name="items[${rowIndex}][item_id]" id="item_name${index}" class="form-control select2-js product-select">
+            <select name="items[${rowIndex}][item_id]" id="item_name${index}" class="form-control select2-js product-select" onchange="onItemNameChange(this)">
               <option value="">Select Item</option>
-              ${products.map(product => `<option value="${product.id}">${product.name}</option>`).join('')}
+              ${products.map(product => `<option value="${product.id}" data-unit-id="${product.measurement_unit}">${product.name}</option>`).join('')}
             </select>
           </td>
           <td><input type="number" name="items[${rowIndex}][quantity]" id="pur_qty${index}" class="form-control quantity" value="0" step="any" onchange="rowTotal(${index})"></td>
@@ -177,6 +177,17 @@
       total += parseFloat($(this).find('input[id^="amount"]').val()) || 0;
     });
     $('#netTotal').text(total.toFixed(2));
+  }
+
+  function onItemNameChange(selectElement) {
+    const idMatch = selectElement.id.match(/\d+$/);
+    if (!idMatch) return;
+    const rowIndex = idMatch[0];
+
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const unitId = selectedOption.getAttribute('data-unit-id');
+    const unitSelector = $(`#unit${rowIndex}`);
+    unitSelector.val(String(unitId)).trigger('change.select2');
   }
 </script>
 @endsection
