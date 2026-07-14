@@ -72,6 +72,11 @@
                                         <a href="{{ route('job_receives.print', $receive->id) }}" target="_blank" class="text-success mr-2" title="Print">
                                             <i class="fas fa-print"></i>
                                         </a>
+                                        @can('job_receives.edit')
+                                        <a href="{{ route('job_receives.edit', $receive->id) }}" class="text-primary mr-2" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        @endcan
                                         @can('job_receives.delete')
                                         <form action="{{ route('job_receives.destroy', $receive->id) }}" method="POST" style="display:inline;">
                                             @csrf @method('DELETE')
