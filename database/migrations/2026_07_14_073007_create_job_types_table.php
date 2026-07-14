@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique(); // Weaving, Dyeing, Processing, Finishing, Packaging, Other
             $table->unsignedBigInteger('service_cost_account_id')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
 
             $table->foreign('service_cost_account_id')->references('id')->on('chart_of_accounts')->onDelete('set null');
