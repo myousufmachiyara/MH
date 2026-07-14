@@ -13,8 +13,20 @@
         </header>
 
         <div class="card-body">
+
+          @if($fromOrder)
+            <div class="alert alert-info d-flex justify-content-between align-items-center py-2">
+              <span>
+                <i class="fas fa-exchange-alt me-1"></i>
+                Converting Purchase Order <strong>{{ $fromOrder->order_no }}</strong>
+                — items below were pre-filled from this order.
+              </span>
+            </div>
+            <input type="hidden" name="from_order_id" value="{{ $fromOrder->id }}">
+          @endif
+
           <div class="row">
-            <input type="hidden" id="itemCount" name="items" value="1">
+            <input type="hidden" id="itemCount" name="items" value="{{ $fromOrder ? $fromOrder->items->count() : 1 }}">
 
             <div class="col-md-2 mb-3">
               <label>Invoice Date</label>
@@ -23,12 +35,20 @@
 
             <div class="col-md-2 mb-3">
               <label>Vendor</label>
-              <select name="vendor_id" class="form-control select2-js" required>
+              <select name="vendor_id" class="form-control select2-js" required
+                      {{ $fromOrder ? 'disabled' : '' }}>
                 <option value="">Select Vendor</option>
                 @foreach ($vendors as $vendor)
-                  <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                  <option value="{{ $vendor->id }}"
+                    @selected($fromOrder && $vendor->id == $fromOrder->vendor_id)>
+                    {{ $vendor->name }}
+                  </option>
                 @endforeach
               </select>
+              {{-- disabled selects don't submit — resend the value via a hidden field --}}
+              @if($fromOrder)
+                <input type="hidden" name="vendor_id" value="{{ $fromOrder->vendor_id }}">
+              @endif
             </div>
 
             <div class="col-md-2 mb-3">
@@ -38,7 +58,7 @@
 
             <div class="col-md-2 mb-3">
               <label>Ref.</label>
-              <input type="text" name="ref_no" class="form-control">
+              <input type="text" name="ref_no" class="form-control" value="{{ $fromOrder->order_no ?? '' }}">
             </div>
 
             <div class="col-md-3 mb-3">
@@ -48,7 +68,7 @@
 
             <div class="col-md-4 mb-3">
               <label>Remarks</label>
-              <textarea name="remarks" class="form-control" rows="3"></textarea>
+              <textarea name="remarks" class="form-control" rows="3">{{ $fromOrder ? 'Converted from ' . $fromOrder->order_no : '' }}</textarea>
             </div>
           </div>
 
@@ -67,40 +87,78 @@
                 </tr>
               </thead>
               <tbody id="Purchase1Table">
-                <tr>
-                  <td class="serial-no">1</td>
-                  <td>
-                    <select name="items[0][item_id]" id="item_name1" class="form-control select2-js product-select" onchange="onItemNameChange(this)">
-                      <option value="">Select Item</option>
-                      @foreach ($products as $product)
-                        <option value="{{ $product->id }}" 
-                                data-unit-id="{{ $product->measurement_unit }}">
-                          {{ $product->name }}
-                        </option>
-                      @endforeach
-                    </select>
-                  </td>                
-                  <td>
-                    <select name="items[0][variation_id]" id="variation1" class="form-control select2-js variation-select">
-                      <option value="">Select Variation</option>
-                    </select>
-                  </td>              
-                  <td><input type="number" name="items[0][quantity]" id="pur_qty1" class="form-control quantity" value="0" step="any" onchange="rowTotal(1)"></td>
-                  <td>
-                    <select name="items[0][unit]" id="unit1" class="form-control" required>
-                      <option value="">-- Select --</option>
-                      @foreach ($units as $unit)
-                        <option value="{{ $unit->id }}">{{ $unit->name }} ({{ $unit->shortcode }})</option>
-                      @endforeach
-                    </select>
-                  </td>
-
-                  <td><input type="number" name="items[0][price]" id="pur_price1" class="form-control" value="0" step="any" onchange="rowTotal(1)"></td>
-                  <td><input type="number" id="amount1" class="form-control" value="0" step="any" disabled></td>
-                  <td>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)"><i class="fas fa-times"></i></button>
-                  </td>
-                </tr>
+                @if($fromOrder)
+                  @foreach($fromOrder->items as $i => $poItem)
+                  <tr>
+                    <td class="serial-no">{{ $i + 1 }}</td>
+                    <td>
+                      <select name="items[{{ $i }}][item_id]" id="item_name{{ $i + 1 }}" class="form-control select2-js product-select" onchange="onItemNameChange(this)">
+                        <option value="">Select Item</option>
+                        @foreach ($products as $product)
+                          <option value="{{ $product->id }}"
+                                  data-unit-id="{{ $product->measurement_unit }}"
+                                  @selected($product->id == $poItem->product_id)>
+                            {{ $product->name }}
+                          </option>
+                        @endforeach
+                      </select>
+                    </td>
+                    <td>
+                      <select name="items[{{ $i }}][variation_id]" id="variation{{ $i + 1 }}" class="form-control select2-js variation-select">
+                        <option value="">Select Variation</option>
+                      </select>
+                    </td>
+                    <td><input type="number" name="items[{{ $i }}][quantity]" id="pur_qty{{ $i + 1 }}" class="form-control quantity" value="{{ $poItem->quantity }}" step="any" onchange="rowTotal({{ $i + 1 }})"></td>
+                    <td>
+                      <select name="items[{{ $i }}][unit]" id="unit{{ $i + 1 }}" class="form-control" required>
+                        <option value="">-- Select --</option>
+                        @foreach ($units as $unit)
+                          <option value="{{ $unit->id }}" @selected($unit->id == $poItem->product?->measurement_unit)>{{ $unit->name }} ({{ $unit->shortcode }})</option>
+                        @endforeach
+                      </select>
+                    </td>
+                    <td><input type="number" name="items[{{ $i }}][price]" id="pur_price{{ $i + 1 }}" class="form-control" value="{{ $poItem->estimated_price }}" step="any" onchange="rowTotal({{ $i + 1 }})"></td>
+                    <td><input type="number" id="amount{{ $i + 1 }}" class="form-control" value="{{ $poItem->amount }}" step="any" disabled></td>
+                    <td>
+                      <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)"><i class="fas fa-times"></i></button>
+                    </td>
+                  </tr>
+                  @endforeach
+                @else
+                  <tr>
+                    <td class="serial-no">1</td>
+                    <td>
+                      <select name="items[0][item_id]" id="item_name1" class="form-control select2-js product-select" onchange="onItemNameChange(this)">
+                        <option value="">Select Item</option>
+                        @foreach ($products as $product)
+                          <option value="{{ $product->id }}"
+                                  data-unit-id="{{ $product->measurement_unit }}">
+                            {{ $product->name }}
+                          </option>
+                        @endforeach
+                      </select>
+                    </td>
+                    <td>
+                      <select name="items[0][variation_id]" id="variation1" class="form-control select2-js variation-select">
+                        <option value="">Select Variation</option>
+                      </select>
+                    </td>
+                    <td><input type="number" name="items[0][quantity]" id="pur_qty1" class="form-control quantity" value="0" step="any" onchange="rowTotal(1)"></td>
+                    <td>
+                      <select name="items[0][unit]" id="unit1" class="form-control" required>
+                        <option value="">-- Select --</option>
+                        @foreach ($units as $unit)
+                          <option value="{{ $unit->id }}">{{ $unit->name }} ({{ $unit->shortcode }})</option>
+                        @endforeach
+                      </select>
+                    </td>
+                    <td><input type="number" name="items[0][price]" id="pur_price1" class="form-control" value="0" step="any" onchange="rowTotal(1)"></td>
+                    <td><input type="number" id="amount1" class="form-control" value="0" step="any" disabled></td>
+                    <td>
+                      <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)"><i class="fas fa-times"></i></button>
+                    </td>
+                  </tr>
+                @endif
               </tbody>
             </table>
             <button type="button" class="btn btn-outline-primary" onclick="addNewRow_btn()"><i class="fas fa-plus"></i> Add Item</button>
@@ -137,11 +195,12 @@
 
 <script>
   var products = @json($products);
-  var index = 2;
+  var index = {{ $fromOrder ? $fromOrder->items->count() + 1 : 2 }};
 
   $(document).ready(function () {
     $('.select2-js').select2({ width: '100%', dropdownAutoWidth: true });
     updateSerialNumbers();
+    tableTotal(); // recalc totals immediately if rows were pre-filled
   });
 
   function updateSerialNumbers() {
@@ -205,7 +264,7 @@
       table.append(newRow);
       $('#itemCount').val(index);
       $(`#item_name${index}`).select2();
-      $(`#variation${index}`).select2(); // Initialize new variation dropdown
+      $(`#variation${index}`).select2();
       $(`#unit${index}`).select2();
       index++;
       updateSerialNumbers();
@@ -223,13 +282,8 @@
     let qty = 0;
 
     $('#Purchase1Table tr').each(function () {
-
-      // ✅ Amount
       total += parseFloat($(this).find('input[id^="amount"]').val()) || 0;
-
-      // ✅ Quantity (FIXED)
       qty += parseFloat($(this).find('input.quantity').val()) || 0;
-
     });
 
     $('#totalAmount').val(total.toFixed(2));
@@ -255,30 +309,25 @@
   function onItemNameChange(selectElement) {
     const row = $(selectElement).closest('tr');
     const itemId = selectElement.value;
-    
-    // Get the current row index from the ID (e.g., "item_name1" -> "1")
+
     const idMatch = selectElement.id.match(/\d+$/);
     if (!idMatch) return;
     const rowIndex = idMatch[0];
 
-    // 1. Handle Unit Auto-selection
     const selectedOption = selectElement.options[selectElement.selectedIndex];
     const unitId = selectedOption.getAttribute('data-unit-id');
     const unitSelector = $(`#unit${rowIndex}`);
     unitSelector.val(String(unitId)).trigger('change.select2');
 
-    // 2. Fetch Variations via AJAX
     const variationSelect = $(`#variation${rowIndex}`);
-    
+
     if (itemId) {
         variationSelect.html('<option value="">Loading...</option>').trigger('change.select2');
 
-        fetch(`/product/${itemId}/variations`) // Ensure this route exists in web.php
+        fetch(`/product/${itemId}/variations`)
             .then(res => res.json())
             .then(data => {
                 variationSelect.html('<option value="">Select Variation</option>');
-                
-                // Assuming your controller returns { success: true, variation: [...] }
                 if (data.success && data.variation.length > 0) {
                     data.variation.forEach(v => {
                         variationSelect.append(`<option value="${v.id}">${v.sku}</option>`);

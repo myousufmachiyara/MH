@@ -25,13 +25,19 @@ class PurchaseInvoiceController extends Controller
         return view('purchases.index', compact('invoices'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $vendors  = Vendor::active()->orderBy('name')->get();
         $products = Product::active()->orderBy('name')->get();
         $units    = MeasurementUnit::orderBy('name')->get();
 
-        return view('purchases.create', compact('vendors', 'products', 'units'));
+        $fromOrder = null;
+        if ($request->filled('from_order')) {
+            $fromOrder = \App\Models\PurchaseOrder::with('items.product')
+                ->findOrFail($request->from_order);
+        }
+
+        return view('purchases.create', compact('vendors', 'products', 'units', 'fromOrder'));
     }
 
     public function store(Request $request)
@@ -42,6 +48,7 @@ class PurchaseInvoiceController extends Controller
             'bill_no'            => 'nullable|string|max:50',
             'ref_no'             => 'nullable|string|max:50',
             'remarks'            => 'nullable|string',
+            'from_order_id'      => 'nullable|exists:purchase_orders,id',
             'items'              => 'required|array|min:1',
             'items.*.item_id'    => 'required|exists:products,id',
             'items.*.quantity'   => 'required|numeric|min:0.001',
@@ -65,12 +72,19 @@ class PurchaseInvoiceController extends Controller
 
             $purchase = $this->purchaseService->create([
                 'vendor_id'     => $request->vendor_id,
+                'order_id'      => $request->from_order_id, // links purchases.order_id → purchase_orders
                 'purchase_date' => $request->invoice_date,
                 'bill_no'       => $request->bill_no,
                 'ref_no'        => $request->ref_no,
                 'remarks'       => $request->remarks,
                 'attachments'   => $attachments ?: null,
             ], $items, auth()->id());
+
+            // Mark the source PO as Converted so it won't be offered for conversion again
+            if ($request->filled('from_order_id')) {
+                \App\Models\PurchaseOrder::where('id', $request->from_order_id)
+                    ->update(['status' => 'Converted']);
+            }
 
             Log::info('[Purchase] Created', ['id' => $purchase->id, 'by' => auth()->id()]);
 
