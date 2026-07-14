@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->string('code')->unique();
-            $table->unsignedBigInteger('stock_account_id')->nullable()->after('code');
-            $table->unsignedBigInteger('cogs_account_id')->nullable()->after('stock_account_id');
+            $table->unsignedBigInteger('stock_account_id')->nullable();
+            $table->unsignedBigInteger('cogs_account_id')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
