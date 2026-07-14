@@ -83,6 +83,17 @@
                                         </form>
                                         @endcan
                                     @endif
+                                    @can('jobs.edit')
+                                    @if($job->status === 'Issued')
+                                    <a href="{{ route('jobs.edit', $job->id) }}" class="text-primary mr-2" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    @else
+                                    <span class="text-secondary me-2" title="Cannot edit — job has receives recorded" style="cursor:help;">
+                                        <i class="fas fa-lock"></i>
+                                    </span>
+                                    @endif
+                                    @endcan
                                 </td>
                             </tr>
                             @endforeach

@@ -115,6 +115,44 @@ class JobOrderService
         ]);
     }
 
+    public function update(JobOrder $jobOrder, array $data, array $items, ?int $userId = null): JobOrder
+    {
+        return DB::transaction(function () use ($jobOrder, $data, $items, $userId) {
+
+            if ($jobOrder->receives()->exists()) {
+                throw new \Exception(
+                    'Cannot edit — this job order already has receives recorded against it. ' .
+                    'Delete the receive(s) first, or create a new job order instead.'
+                );
+            }
+
+            // Reverse everything this job order issued
+            VendorStockLedger::where('reference_type', 'JobOrder')
+                ->where('reference_id', $jobOrder->id)
+                ->delete();
+
+            $jobOrder->items()->delete();
+
+            // Update header fields
+            $jobOrder->update([
+                'vendor_id'   => $data['vendor_id'],
+                'sale_id'     => $data['sale_id'] ?? null,
+                'job_type_id' => $data['job_type_id'] ?? null,
+                'issue_date'  => $data['issue_date'],
+                'remarks'     => $data['remarks'] ?? null,
+                'updated_by'  => $userId,
+            ]);
+
+            // Re-issue with the new item list (will throw if insufficient
+            // stock, same validation as create)
+            foreach ($items as $item) {
+                $this->issueStock($jobOrder, $item['product_id'], (float) $item['quantity']);
+            }
+
+            return $jobOrder->load('items.product', 'vendor', 'jobType');
+        });
+    }
+    
     private function generateJobNo(): string
     {
         $last = JobOrder::orderByDesc('id')->value('job_no');

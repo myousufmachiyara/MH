@@ -264,6 +264,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('available-stock',  [JobOrderController::class, 'availableStock'])->name('available_stock')->middleware('check.permission:jobs.index');
         Route::post('/',               [JobOrderController::class, 'store'])         ->name('store')          ->middleware('check.permission:jobs.create');
         Route::get('{id}',             [JobOrderController::class, 'show'])          ->name('show')           ->middleware('check.permission:jobs.index');
+        Route::get('{id}/edit',        [JobOrderController::class, 'edit'])          ->name('edit')           ->middleware('check.permission:jobs.edit');
+        Route::put('{id}',             [JobOrderController::class, 'update'])        ->name('update')         ->middleware('check.permission:jobs.edit');
         Route::delete('{id}',          [JobOrderController::class, 'destroy'])       ->name('destroy')        ->middleware('check.permission:jobs.delete');
         Route::get('{id}/print',       [JobOrderController::class, 'print'])         ->name('print')          ->middleware('check.permission:jobs.print');
 

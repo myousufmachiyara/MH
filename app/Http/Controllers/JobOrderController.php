@@ -144,4 +144,55 @@ class JobOrderController extends Controller
             return back()->with('error', 'Could not delete comment.');
         }
     }
+
+    public function edit($id)
+    {
+        $jobOrder = JobOrder::with('items.product')->findOrFail($id);
+
+        if ($jobOrder->receives()->exists()) {
+            return redirect()->route('jobs.index')
+                ->with('error', 'Cannot edit — this job order already has receives recorded.');
+        }
+
+        $vendors  = Vendor::active()->orderBy('name')->get();
+        $products = Product::active()->orderBy('name')->get();
+        $jobTypes = JobType::active()->orderBy('name')->get();
+
+        return view('job_orders.edit', compact('jobOrder', 'vendors', 'products', 'jobTypes'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'vendor_id'          => 'required|exists:vendors,id',
+            'sale_id'            => 'nullable|exists:sales,id',
+            'job_type_id'        => 'nullable|exists:job_types,id',
+            'issue_date'         => 'required|date',
+            'remarks'            => 'nullable|string',
+            'items'              => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity'   => 'required|numeric|min:0.001',
+        ]);
+
+        try {
+            $jobOrder = JobOrder::findOrFail($id);
+
+            $updated = $this->service->update($jobOrder, [
+                'vendor_id'   => $request->vendor_id,
+                'sale_id'     => $request->sale_id,
+                'job_type_id' => $request->job_type_id,
+                'issue_date'  => $request->issue_date,
+                'remarks'     => $request->remarks,
+            ], $request->items, auth()->id());
+
+            Log::info('[JobOrder] Updated', ['id' => $id, 'by' => auth()->id()]);
+
+            return redirect()->route('jobs.index')
+                ->with('success', 'Job order ' . $updated->job_no . ' updated successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('[JobOrder] Update failed', ['id' => $id, 'message' => $e->getMessage()]);
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+    }
 }
