@@ -10,8 +10,8 @@ class AccountMappingController extends Controller
 {
     public function __construct(private AccountMappingService $service)
     {
-        // Viewing the mapping screen requires coa.view
-        $this->middleware('check.permission:coa.view')->only('index');
+        // Viewing the mapping screen requires coa.index
+        $this->middleware('check.permission:coa.index')->only('index');
         // Saving mappings requires coa.edit (more sensitive — drives the voucher engine)
         $this->middleware('check.permission:coa.edit')->only('update');
     }
