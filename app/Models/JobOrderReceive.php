@@ -15,7 +15,12 @@ class JobOrderReceive extends Model
         'receive_no', 'job_order_id', 'receive_date',
         'processing_charge', 'remarks', 'created_by', 'updated_by',
     ];
-
+    
+    protected $casts = [
+        'receive_date'       => 'date',
+        'processing_charge'  => 'decimal:2',
+        'attachments'        => 'array',
+    ];
     public function jobOrder() { return $this->belongsTo(JobOrder::class, 'job_order_id'); }
     public function items()    { return $this->hasMany(JobOrderReceiveItem::class, 'job_order_receive_id'); }
 }
