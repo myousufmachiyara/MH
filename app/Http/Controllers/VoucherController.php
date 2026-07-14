@@ -78,9 +78,11 @@ class VoucherController extends Controller
         if (!$referenceType || !$referenceId) return null;
 
         return match ($referenceType) {
-            'Purchase' => route('purchase.show', $referenceId),
-            'Sale'     => route('sale.show', $referenceId),
-            default    => null,
+            'Purchase'       => route('purchase_invoices.edit', $referenceId),
+            'PurchaseReturn' => route('purchase_returns.edit', $referenceId),
+            'JobOrderReceive'=> route('job_receives.show', $referenceId),
+            'Sale'           => null, // route added once Sale module exists
+            default          => null,
         };
     }
 
@@ -95,18 +97,18 @@ class VoucherController extends Controller
         return view('vouchers.form', compact('type', 'accounts', 'customers', 'vendors'));
     }
 
-public function store(Request $request, string $type)
-{
-    abort_unless(in_array($type, ['payment', 'receipt', 'journal', 'contra']), 404);
+    public function store(Request $request, string $type)
+    {
+        abort_unless(in_array($type, ['payment', 'receipt', 'journal', 'contra']), 404);
 
-    $attachments = $this->handleUploads($request);
+        $attachments = $this->handleUploads($request);
 
-    if (in_array($type, ['payment', 'receipt'])) {
-        return $this->storeSimple($request, $type, $attachments);
+        if (in_array($type, ['payment', 'receipt'])) {
+            return $this->storeSimple($request, $type, $attachments);
+        }
+
+        return $this->storeJournalOrContra($request, $type, $attachments);
     }
-
-    return $this->storeJournalOrContra($request, $type, $attachments);
-}
 
     private function storeSimple(Request $request, string $type, ?array $attachments)
     {
@@ -293,25 +295,25 @@ public function store(Request $request, string $type)
         }
     }
 
-public function show(string $type, $id)
-{
-    $voucher = Voucher::with('entries.account', 'entries.party')->findOrFail($id);
+    public function show(string $type, $id)
+    {
+        $voucher = Voucher::with('entries.account', 'entries.party')->findOrFail($id);
 
-    return response()->json([
-        'voucher_no' => $voucher->voucher_no,
-        'date'       => $voucher->voucher_date->format('Y-m-d'),
-        'amount'     => $voucher->entries->sum('debit'),
-        'remarks'    => $voucher->narration,
-        'is_simple'  => false, // always show read-only entries now
-        'entries'    => $voucher->entries->map(fn($e) => [
-            'account_name' => $e->account->name ?? '—',
-            'party_name'   => $e->party->name ?? null,
-            'debit'        => (float) $e->debit,
-            'credit'       => (float) $e->credit,
-            'narration'    => $e->narration,
-        ]),
-    ]);
-}
+        return response()->json([
+            'voucher_no' => $voucher->voucher_no,
+            'date'       => $voucher->voucher_date->format('Y-m-d'),
+            'amount'     => $voucher->entries->sum('debit'),
+            'remarks'    => $voucher->narration,
+            'is_simple'  => false, // always show read-only entries now
+            'entries'    => $voucher->entries->map(fn($e) => [
+                'account_name' => $e->account->name ?? '—',
+                'party_name'   => $e->party->name ?? null,
+                'debit'        => (float) $e->debit,
+                'credit'       => (float) $e->credit,
+                'narration'    => $e->narration,
+            ]),
+        ]);
+    }
 
     public function destroy(string $type, $id)
     {
