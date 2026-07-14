@@ -281,6 +281,11 @@ class DatabaseSeeder extends Seeder
             'created_at' => $now, 'updated_at' => $now,
         ]);
 
+        DB::table('product_categories')->insert([
+            'id' => 2, 'name' => 'Greige', 'code' => 'greige',
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+
         DB::table('products')->insert([
             'id'               => 1,
             'category_id'      => 1,
@@ -291,6 +296,21 @@ class DatabaseSeeder extends Seeder
             'opening_stock'    => 0.00,
             'selling_price'    => 0.00,
             'measurement_unit' => 6, // lbs
+            'is_active'        => 1,
+            'track_lots'       => 0,
+            'created_at'       => $now,
+            'updated_at'       => $now,
+        ]);
+        DB::table('products')->insert([
+            'id'               => 2,
+            'category_id'      => 2,
+            'subcategory_id'   => null,
+            'name'             => 'greige-0002',
+            'sku'              => 'Greige-0002',
+            'description'      => null,
+            'opening_stock'    => 0.00,
+            'selling_price'    => 0.00,
+            'measurement_unit' => 2, // lbs
             'is_active'        => 1,
             'track_lots'       => 0,
             'created_at'       => $now,
