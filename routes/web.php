@@ -35,6 +35,7 @@ use App\Http\Controllers\{
     GatePassController,
     JobOrderController,
     JobOrderReceiveController,
+    JobTypeController,
     SaleController,
 
     // Finance
