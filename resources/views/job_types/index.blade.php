@@ -36,7 +36,7 @@
                 <a href="javascript:void(0)" class="text-primary" onclick="editJobType({{ $jt->id }}, '{{ $jt->name }}', {{ $jt->service_cost_account_id ?? 'null' }}, {{ $jt->is_active ? 1 : 0 }})">
                   <i class="fa fa-edit"></i>
                 </a>
-                <form action="{{ route('job_types.destroy', $jt->id) }}" method="POST" class="d-inline">
+                <form action="{{ route('job-types.destroy', $jt->id) }}" method="POST" class="d-inline">
                   @csrf @method('DELETE')
                   <button class="btn btn-link p-0 text-danger" onclick="return confirm('Delete?')"><i class="fa fa-trash-alt"></i></button>
                 </form>
@@ -50,7 +50,7 @@
 
     <div id="addModal" class="modal-block modal-block-primary mfp-hide">
       <section class="card">
-        <form method="POST" action="{{ route('job_types.store') }}">
+        <form method="POST" action="{{ route('job-types.store') }}">
           @csrf
           <header class="card-header"><h2 class="card-title">Add Job Type</h2></header>
           <div class="card-body">
