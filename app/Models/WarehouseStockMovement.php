@@ -10,7 +10,7 @@ class WarehouseStockMovement extends Model
 
     protected $fillable = [
         'product_id', 'movement_type', 'quantity', 'amount',
-        'reference_type', 'reference_id', 'movement_date',
+        'reference_type', 'reference_id', 'doc_no', 'movement_date',
     ];
 
     protected $casts = [

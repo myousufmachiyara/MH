@@ -244,11 +244,13 @@ Route::middleware(['auth'])->group(function () {
     // GATE PASS
     // ────────────────────────────────────────────────────────────────
     Route::prefix('gate-passes')->name('gate_passes.')->group(function () {
-        Route::get('/',        [GatePassController::class, 'index'])   ->name('index')  ->middleware('check.permission:purchase.index');
-        Route::get('create',   [GatePassController::class, 'create'])  ->name('create') ->middleware('check.permission:purchase.create');
-        Route::post('/',       [GatePassController::class, 'store'])   ->name('store')  ->middleware('check.permission:purchase.create');
-        Route::delete('{id}',  [GatePassController::class, 'destroy']) ->name('destroy')->middleware('check.permission:purchase.delete');
-        Route::get('{id}/print', [GatePassController::class, 'print']) ->name('print')  ->middleware('check.permission:purchase.print');
+        Route::get('/',           [GatePassController::class, 'index'])   ->name('index')  ->middleware('check.permission:gate_passes.index');
+        Route::get('create',      [GatePassController::class, 'create'])  ->name('create') ->middleware('check.permission:gate_passes.create');
+        Route::post('/',          [GatePassController::class, 'store'])   ->name('store')  ->middleware('check.permission:gate_passes.create');
+        Route::get('{docNo}/edit',[GatePassController::class, 'edit'])    ->name('edit')   ->middleware('check.permission:gate_passes.edit');
+        Route::put('{docNo}',     [GatePassController::class, 'update'])  ->name('update') ->middleware('check.permission:gate_passes.edit');
+        Route::delete('{docNo}',  [GatePassController::class, 'destroy']) ->name('destroy')->middleware('check.permission:gate_passes.delete');
+        Route::get('{docNo}/print', [GatePassController::class, 'print']) ->name('print')  ->middleware('check.permission:gate_passes.print');
     });
 
     // ────────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@
 
             <header class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="card-title">Gate Passes</h2>
-                @can('purchase.create')
+                @can('gate_passes.create')
                 <a href="{{ route('gate_passes.create') }}" class="btn btn-primary">
                     <i class="fas fa-plus"></i> New Gate Pass
                 </a>
@@ -36,8 +36,7 @@
                                 <th>Date</th>
                                 <th>Gate Pass #</th>
                                 <th>Vendor</th>
-                                <th>Product</th>
-                                <th class="text-end">Quantity</th>
+                                <th>Items</th>
                                 <th>Remarks</th>
                                 <th width="8%">Actions</th>
                             </tr>
@@ -49,15 +48,23 @@
                                 <td>{{ \Carbon\Carbon::parse($gp->entry_date)->format('d-M-Y') }}</td>
                                 <td class="text-primary">{{ $gp->doc_no }}</td>
                                 <td>{{ $gp->vendor->name ?? 'N/A' }}</td>
-                                <td>{{ $gp->product->name ?? 'N/A' }}</td>
-                                <td class="text-end">{{ number_format($gp->quantity, 3) }}</td>
+                                <td class="small">
+                                    @foreach($gp->items as $item)
+                                        {{ $item->product->name ?? '' }} ({{ number_format($item->quantity, 3) }})@if(!$loop->last), @endif
+                                    @endforeach
+                                </td>
                                 <td class="text-muted small">{{ Str::limit($gp->remarks, 40) }}</td>
                                 <td>
-                                    <a href="{{ route('gate_passes.print', $gp->id) }}" target="_blank" class="text-success mr-2" title="Print">
+                                    <a href="{{ route('gate_passes.print', $gp->doc_no) }}" target="_blank" class="text-success mr-2" title="Print">
                                         <i class="fas fa-print"></i>
                                     </a>
-                                    @can('purchase.delete')
-                                    <form action="{{ route('gate_passes.destroy', $gp->id) }}" method="POST" style="display:inline;">
+                                    @can('gate_passes.edit')
+                                    <a href="{{ route('gate_passes.edit', $gp->doc_no) }}" class="text-primary mr-2" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    @endcan
+                                    @can('gate_passes.delete')
+                                    <form action="{{ route('gate_passes.destroy', $gp->doc_no) }}" method="POST" style="display:inline;">
                                         @csrf @method('DELETE')
                                         <button class="btn btn-link p-0 text-danger" onclick="return confirm('Delete this gate pass?')" title="Delete">
                                             <i class="fa fa-trash-alt"></i>

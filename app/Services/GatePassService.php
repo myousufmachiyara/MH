@@ -3,43 +3,129 @@
 namespace App\Services;
 
 use App\Models\VendorStockLedger;
+use App\Models\WarehouseStockMovement;
 use Illuminate\Support\Facades\DB;
 
 class GatePassService
 {
-    public function create(array $data, ?int $userId = null): VendorStockLedger
+    // $data: vendor_id, entry_date, remarks
+    // $items: [ ['product_id' => .., 'quantity' => ..], ... ]
+    public function create(array $data, array $items, ?int $userId = null): string
     {
-        return DB::transaction(function () use ($data, $userId) {
-            return VendorStockLedger::create([
-                'doc_no'         => $this->generateDocNo(),
-                'vendor_id'      => $data['vendor_id'],
-                'product_id'     => $data['product_id'],
-                'status'         => VendorStockLedger::STATUS_FRESH,
-                'quantity'       => abs((float) $data['quantity']), // always positive — stock arriving
-                'reference_type' => 'GatePass',
-                'reference_id'   => null,
-                'entry_date'     => $data['entry_date'],
-                'remarks'        => $data['remarks'] ?? null,
-                'created_by'     => $userId,
-            ]);
+        return DB::transaction(function () use ($data, $items, $userId) {
+            $docNo = $this->generateDocNo();
+
+            foreach ($items as $item) {
+                $qty = abs((float) $item['quantity']);
+
+                VendorStockLedger::create([
+                    'doc_no'         => $docNo,
+                    'vendor_id'      => $data['vendor_id'],
+                    'product_id'     => $item['product_id'],
+                    'status'         => VendorStockLedger::STATUS_FRESH,
+                    'quantity'       => $qty,
+                    'reference_type' => 'GatePass',
+                    'reference_id'   => null,
+                    'entry_date'     => $data['entry_date'],
+                    'remarks'        => $data['remarks'] ?? null,
+                    'created_by'     => $userId,
+                ]);
+
+                WarehouseStockMovement::create([
+                    'product_id'      => $item['product_id'],
+                    'movement_type'   => 'GatePassOut',
+                    'quantity'        => -$qty,
+                    'amount'          => 0,
+                    'reference_type'  => 'GatePass',
+                    'reference_id'    => null,
+                    'doc_no'          => $docNo,
+                    'movement_date'   => $data['entry_date'],
+                ]);
+            }
+
+            return $docNo;
         });
     }
 
-    public function delete(VendorStockLedger $entry): void
+    public function update(string $docNo, array $data, array $items, ?int $userId = null): string
     {
-        // Guard: if this fresh stock has already been partially/fully issued
-        // to a job, deleting the gate pass could push the vendor's fresh
-        // pool negative. Block if that would happen.
-        $fresh = VendorStockLedger::balance($entry->vendor_id, $entry->product_id, 'fresh');
+        return DB::transaction(function () use ($docNo, $data, $items, $userId) {
 
-        if (($fresh - $entry->quantity) < 0) {
-            throw new \Exception(
-                'Cannot delete — some of this stock has already been issued to a job. ' .
-                'Current fresh balance would go negative.'
-            );
-        }
+            $existingEntries = VendorStockLedger::gatePasses()->where('doc_no', $docNo)->get();
 
-        $entry->delete();
+            // Guard: block edit if any of the original items have already
+            // been (partially or fully) issued to a job — editing would
+            // corrupt the Fresh pool those issues drew from.
+            foreach ($existingEntries as $entry) {
+                $fresh = VendorStockLedger::balance($entry->vendor_id, $entry->product_id, 'fresh');
+                if (($fresh - $entry->quantity) < 0) {
+                    throw new \Exception(
+                        "Cannot edit — {$entry->product?->name} has already been issued to a job. " .
+                        "Delete is also blocked for the same reason; the stock must remain traceable."
+                    );
+                }
+            }
+
+            // Reverse the old entries entirely
+            WarehouseStockMovement::where('reference_type', 'GatePass')
+                ->where('doc_no', $docNo)
+                ->delete();
+
+            $existingEntries->each->delete();
+
+            // Recreate with the new data, same doc_no preserved
+            foreach ($items as $item) {
+                $qty = abs((float) $item['quantity']);
+
+                VendorStockLedger::create([
+                    'doc_no'         => $docNo,
+                    'vendor_id'      => $data['vendor_id'],
+                    'product_id'     => $item['product_id'],
+                    'status'         => VendorStockLedger::STATUS_FRESH,
+                    'quantity'       => $qty,
+                    'reference_type' => 'GatePass',
+                    'reference_id'   => null,
+                    'entry_date'     => $data['entry_date'],
+                    'remarks'        => $data['remarks'] ?? null,
+                    'created_by'     => $userId,
+                ]);
+
+                WarehouseStockMovement::create([
+                    'product_id'      => $item['product_id'],
+                    'movement_type'   => 'GatePassOut',
+                    'quantity'        => -$qty,
+                    'amount'          => 0,
+                    'reference_type'  => 'GatePass',
+                    'reference_id'    => null,
+                    'doc_no'          => $docNo,
+                    'movement_date'   => $data['entry_date'],
+                ]);
+            }
+
+            return $docNo;
+        });
+    }
+    
+    public function deleteByDocNo(string $docNo): void
+    {
+        DB::transaction(function () use ($docNo) {
+            $entries = VendorStockLedger::gatePasses()->where('doc_no', $docNo)->get();
+
+            foreach ($entries as $entry) {
+                $fresh = VendorStockLedger::balance($entry->vendor_id, $entry->product_id, 'fresh');
+                if (($fresh - $entry->quantity) < 0) {
+                    throw new \Exception(
+                        "Cannot delete — {$entry->product?->name} has already been issued to a job."
+                    );
+                }
+            }
+
+            WarehouseStockMovement::where('reference_type', 'GatePass')
+                ->where('doc_no', $docNo)
+                ->delete();
+
+            $entries->each->delete();
+        });
     }
 
     public function vendorStockSummary(?int $vendorId = null)

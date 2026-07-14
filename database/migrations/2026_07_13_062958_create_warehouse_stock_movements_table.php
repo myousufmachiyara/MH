@@ -20,6 +20,7 @@ return new class extends Migration
 
             $table->string('reference_type', 30);
             $table->unsignedBigInteger('reference_id');
+            $table->string('doc_no', 30)->nullable();
 
             $table->date('movement_date');
             $table->timestamps();

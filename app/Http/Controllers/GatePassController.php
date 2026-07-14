@@ -15,11 +15,25 @@ class GatePassController extends Controller
 
     public function index()
     {
-        $gatePasses = VendorStockLedger::gatePasses()
+        // Group ledger rows by doc_no so each gate pass shows as ONE row
+        // with its items, not one row per product.
+        $rows = VendorStockLedger::gatePasses()
             ->with('vendor', 'product')
             ->orderByDesc('entry_date')
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->groupBy('doc_no');
+
+        $gatePasses = $rows->map(function ($items, $docNo) {
+            $first = $items->first();
+            return (object) [
+                'doc_no'     => $docNo,
+                'vendor'     => $first->vendor,
+                'entry_date' => $first->entry_date,
+                'remarks'    => $first->remarks,
+                'items'      => $items,
+            ];
+        })->values();
 
         return view('gate_passes.index', compact('gatePasses'));
     }
@@ -32,57 +46,105 @@ class GatePassController extends Controller
         return view('gate_passes.create', compact('vendors', 'products'));
     }
 
-    public function store(array $data, ?int $userId = null): VendorStockLedger
+    public function store(Request $request)
     {
-        return DB::transaction(function () use ($data, $userId) {
-            $docNo = $this->generateDocNo();
+        $request->validate([
+            'vendor_id'          => 'required|exists:vendors,id',
+            'entry_date'         => 'required|date',
+            'remarks'            => 'nullable|string|max:500',
+            'items'              => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity'   => 'required|numeric|min:0.001',
+        ]);
 
-            $entry = VendorStockLedger::create([
-                'doc_no'         => $docNo,
-                'vendor_id'      => $data['vendor_id'],
-                'product_id'     => $data['product_id'],
-                'status'         => VendorStockLedger::STATUS_FRESH,
-                'quantity'       => abs((float) $data['quantity']),
-                'reference_type' => 'GatePass',
-                'reference_id'   => null,
-                'entry_date'     => $data['entry_date'],
-                'remarks'        => $data['remarks'] ?? null,
-                'created_by'     => $userId,
-            ]);
+        try {
+            $docNo = $this->service->create([
+                'vendor_id'  => $request->vendor_id,
+                'entry_date' => $request->entry_date,
+                'remarks'    => $request->remarks,
+            ], $request->items, auth()->id());
 
-            // Reduce our own warehouse stock — this material has physically left.
-            WarehouseStockMovement::create([
-                'product_id'      => $data['product_id'],
-                'movement_type'   => 'GatePassOut',
-                'quantity'        => -abs((float) $data['quantity']),
-                'amount'          => 0, // no value change, just relocation
-                'reference_type'  => 'GatePass',
-                'reference_id'    => $entry->id,
-                'movement_date'   => $data['entry_date'],
-            ]);
+            Log::info('[GatePass] Created', ['doc_no' => $docNo, 'by' => auth()->id()]);
 
-            return $entry;
-        });
+            return redirect()->route('gate_passes.index')
+                ->with('success', 'Gate pass ' . $docNo . ' created successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('[GatePass] Store failed', ['message' => $e->getMessage()]);
+            return back()->withInput()->with('error', $e->getMessage());
+        }
     }
-    
-    public function destroy(VendorStockLedger $entry): void
-    {
-        $fresh = VendorStockLedger::balance($entry->vendor_id, $entry->product_id, 'fresh');
 
-        if (($fresh - $entry->quantity) < 0) {
-            throw new \Exception(
-                'Cannot delete — some of this stock has already been issued to a job.'
-            );
+    public function edit($docNo)
+    {
+        $entries = VendorStockLedger::gatePasses()
+            ->with('vendor', 'product')
+            ->where('doc_no', $docNo)
+            ->get();
+
+        if ($entries->isEmpty()) {
+            abort(404);
         }
 
-        WarehouseStockMovement::where('reference_type', 'GatePass')
-            ->where('reference_id', $entry->id)
-            ->delete();
+        $first = $entries->first();
+        $gatePass = (object) [
+            'doc_no'     => $docNo,
+            'vendor_id'  => $first->vendor_id,
+            'entry_date' => $first->entry_date,
+            'remarks'    => $first->remarks,
+            'items'      => $entries,
+        ];
 
-        $entry->delete();
+        $vendors  = Vendor::active()->orderBy('name')->get();
+        $products = Product::active()->orderBy('name')->get();
+
+        return view('gate_passes.edit', compact('gatePass', 'vendors', 'products'));
     }
 
-    public function print($id)
+    public function update(Request $request, $docNo)
+    {
+        $request->validate([
+            'vendor_id'          => 'required|exists:vendors,id',
+            'entry_date'         => 'required|date',
+            'remarks'            => 'nullable|string|max:500',
+            'items'              => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity'   => 'required|numeric|min:0.001',
+        ]);
+
+        try {
+            $this->service->update($docNo, [
+                'vendor_id'  => $request->vendor_id,
+                'entry_date' => $request->entry_date,
+                'remarks'    => $request->remarks,
+            ], $request->items, auth()->id());
+
+            Log::info('[GatePass] Updated', ['doc_no' => $docNo, 'by' => auth()->id()]);
+
+            return redirect()->route('gate_passes.index')
+                ->with('success', 'Gate pass updated successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('[GatePass] Update failed', ['doc_no' => $docNo, 'message' => $e->getMessage()]);
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+    
+    public function destroy($docNo)
+    {
+        try {
+            $this->service->deleteByDocNo($docNo);
+
+            return redirect()->route('gate_passes.index')
+                ->with('success', 'Gate pass deleted successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('[GatePass] Destroy failed', ['doc_no' => $docNo, 'message' => $e->getMessage()]);
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function print($docNo)
     {
         abort(404, 'Print not yet implemented');
     }
