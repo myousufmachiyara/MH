@@ -209,7 +209,7 @@
                             @endcan
                             @can('job_types.index')
                             <li class="{{ request()->routeIs('job_types.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('job_types.index') }}">Job Types</a>
+                                <a class="nav-link" href="{{ route('job-types.index') }}">Job Types</a>
                             </li>
                             @endcan
                         </ul>
