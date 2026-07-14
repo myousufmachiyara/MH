@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('amount', 15, 2)->default(0); // value, for costing
 
             $table->string('reference_type', 30);
-            $table->unsignedBigInteger('reference_id');
+            $table->unsignedBigInteger('reference_id')->nullable();
             $table->string('doc_no', 30)->nullable();
 
             $table->date('movement_date');
