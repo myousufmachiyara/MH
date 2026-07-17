@@ -197,20 +197,20 @@
                             <span>Jobs</span>
                         </a>
                         <ul class="nav nav-children">
+                            @can('job_types.index')
+                                <li class="{{ request()->routeIs('job_types.*') ? 'active' : '' }}">
+                                    <a class="nav-link" href="{{ route('job-types.index') }}">Job Types</a>
+                                </li>
+                            @endcan
                             @can('jobs.index')
-                            <li class="{{ request()->routeIs('jobs.*') && !request()->routeIs('jobs.receive.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('jobs.index') }}">All Jobs</a>
-                            </li>
+                                <li class="{{ request()->routeIs('jobs.*') && !request()->routeIs('jobs.receive.*') ? 'active' : '' }}">
+                                    <a class="nav-link" href="{{ route('jobs.index') }}">Job Issue</a>
+                                </li>
                             @endcan
                             @can('job_receives.index')
-                            <li class="{{ request()->routeIs('job_receives.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('job_receives.index') }}">Job Receives</a>
-                            </li>
-                            @endcan
-                            @can('job_types.index')
-                            <li class="{{ request()->routeIs('job_types.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('job-types.index') }}">Job Types</a>
-                            </li>
+                                <li class="{{ request()->routeIs('job_receives.*') ? 'active' : '' }}">
+                                    <a class="nav-link" href="{{ route('job_receives.index') }}">Job Receives</a>
+                                </li>
                             @endcan
                         </ul>
                     </li>
