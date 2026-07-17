@@ -212,6 +212,12 @@
                                     <a class="nav-link" href="{{ route('job_receives.index') }}">Job Receives</a>
                                 </li>
                             @endcan
+
+                            @can('quality_checks.index')
+                                <li class="{{ request()->routeIs('quality_checks.*') ? 'active' : '' }}">
+                                    <a class="nav-link" href="{{ route('quality_checks.index') }}">Quality Checks</a>
+                                </li>
+                            @endcan
                         </ul>
                     </li>
                     @endif

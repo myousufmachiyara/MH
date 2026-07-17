@@ -36,6 +36,7 @@ use App\Http\Controllers\{
     JobOrderController,
     JobOrderReceiveController,
     JobTypeController,
+    QualityCheckController,
     SaleController,
 
     // Finance
@@ -90,10 +91,10 @@ Route::middleware(['auth'])->group(function () {
     // ────────────────────────────────────────────────────────────────
     // STANDARD CRUD MODULES (auto index/create/store/show/edit/update/destroy/print)
     //
-    // NOTE: 'purchase', 'jobs', 'job_receives' are DELIBERATELY EXCLUDED
-    // from this generic loop — each has its own dedicated, fully-built
-    // route block further down (PurchaseInvoice/Order/Return, JobOrder,
-    // JobOrderReceive). Including them here would shadow those routes.
+    // NOTE: 'purchase', 'jobs', 'job_receives', 'gate_passes',
+    // 'job_types', 'quality_checks' are DELIBERATELY EXCLUDED from this
+    // generic loop — each has its own dedicated, fully-built route block
+    // further down. Including them here would shadow those routes.
     // ────────────────────────────────────────────────────────────────
 
     $modules = [
@@ -253,8 +254,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{docNo}',  [GatePassController::class, 'destroy']) ->name('destroy')->middleware('check.permission:gate_passes.delete');
         Route::get('{docNo}/print', [GatePassController::class, 'print']) ->name('print')  ->middleware('check.permission:gate_passes.print');
     });
-    
+
+    // ────────────────────────────────────────────────────────────────
+    // JOB TYPES (setup/admin screen)
+    // ────────────────────────────────────────────────────────────────
     Route::resource('job-types', JobTypeController::class)->except(['create', 'edit', 'show']);
+
     // ────────────────────────────────────────────────────────────────
     // JOB ORDERS (job order creation = job issue, per finalized design)
     // ────────────────────────────────────────────────────────────────
@@ -263,9 +268,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('create',           [JobOrderController::class, 'create'])        ->name('create')         ->middleware('check.permission:jobs.create');
         Route::get('available-stock',  [JobOrderController::class, 'availableStock'])->name('available_stock')->middleware('check.permission:jobs.index');
         Route::post('/',               [JobOrderController::class, 'store'])         ->name('store')          ->middleware('check.permission:jobs.create');
-        Route::get('{id}',             [JobOrderController::class, 'show'])          ->name('show')           ->middleware('check.permission:jobs.index');
         Route::get('{id}/edit',        [JobOrderController::class, 'edit'])          ->name('edit')           ->middleware('check.permission:jobs.edit');
         Route::put('{id}',             [JobOrderController::class, 'update'])        ->name('update')         ->middleware('check.permission:jobs.edit');
+        Route::get('{id}',             [JobOrderController::class, 'show'])          ->name('show')           ->middleware('check.permission:jobs.index');
         Route::delete('{id}',          [JobOrderController::class, 'destroy'])       ->name('destroy')        ->middleware('check.permission:jobs.delete');
         Route::get('{id}/print',       [JobOrderController::class, 'print'])         ->name('print')          ->middleware('check.permission:jobs.print');
 
@@ -279,12 +284,23 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('job-receives')->name('job_receives.')->group(function () {
         Route::get('/',                        [JobOrderReceiveController::class, 'index'])       ->name('index')      ->middleware('check.permission:job_receives.index');
         Route::get('create',                   [JobOrderReceiveController::class, 'create'])      ->name('create')     ->middleware('check.permission:job_receives.create');
-        Route::get('{id}/edit', [JobOrderReceiveController::class, 'edit'])->name('edit')->middleware('check.permission:job_receives.edit');
-        Route::put('{id}', [JobOrderReceiveController::class, 'update'])->name('update')->middleware('check.permission:job_receives.edit');
         Route::get('outstanding/{jobOrderId}', [JobOrderReceiveController::class, 'outstanding'])  ->name('outstanding')->middleware('check.permission:job_receives.index');
+        Route::get('{id}/edit',                 [JobOrderReceiveController::class, 'edit'])        ->name('edit')       ->middleware('check.permission:job_receives.edit');
+        Route::put('{id}',                      [JobOrderReceiveController::class, 'update'])      ->name('update')     ->middleware('check.permission:job_receives.edit');
         Route::post('/',                        [JobOrderReceiveController::class, 'store'])       ->name('store')      ->middleware('check.permission:job_receives.create');
         Route::get('{id}',                      [JobOrderReceiveController::class, 'show'])         ->name('show')       ->middleware('check.permission:job_receives.index');
         Route::delete('{id}',                   [JobOrderReceiveController::class, 'destroy'])     ->name('destroy')    ->middleware('check.permission:job_receives.delete');
         Route::get('{id}/print',                [JobOrderReceiveController::class, 'print'])        ->name('print')      ->middleware('check.permission:job_receives.print');
+    });
+
+    // ────────────────────────────────────────────────────────────────
+    // QUALITY CHECKS
+    // ────────────────────────────────────────────────────────────────
+    Route::prefix('quality-checks')->name('quality_checks.')->group(function () {
+        Route::get('/',       [QualityCheckController::class, 'index'])   ->name('index')  ->middleware('check.permission:quality_checks.index');
+        Route::get('create',  [QualityCheckController::class, 'create'])  ->name('create') ->middleware('check.permission:quality_checks.create');
+        Route::post('/',      [QualityCheckController::class, 'store'])   ->name('store')  ->middleware('check.permission:quality_checks.create');
+        Route::delete('{id}', [QualityCheckController::class, 'destroy']) ->name('destroy')->middleware('check.permission:quality_checks.delete');
+        Route::get('{id}/print', [QualityCheckController::class, 'print'])->name('print')  ->middleware('check.permission:quality_checks.print');
     });
 });

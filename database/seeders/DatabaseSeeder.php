@@ -79,10 +79,11 @@ class DatabaseSeeder extends Seeder
 
             // Core flow — matches mobile dashboard/bottom-nav 1:1
             'orders',
-            'gate_passes',
             'purchase',
+            'gate_passes',
             'jobs',
             'job_receives',
+            'quality_checks',
             'sale',
 
             // Finance
