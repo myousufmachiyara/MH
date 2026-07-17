@@ -176,13 +176,13 @@
                         <ul class="nav nav-children">
                             @can('purchase.index')
                             <li class="{{ request()->routeIs('purchase_orders.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('purchase_orders.index') }}">Purchase Orders</a>
+                                <a class="nav-link" href="{{ route('purchase_orders.index') }}">Orders</a>
                             </li>
                             <li class="{{ request()->routeIs('purchase_invoices.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('purchase_invoices.index') }}">Purchase Invoices</a>
+                                <a class="nav-link" href="{{ route('purchase_invoices.index') }}">Invoices</a>
                             </li>
                             <li class="{{ request()->routeIs('purchase_returns.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('purchase_returns.index') }}">Purchase Returns</a>
+                                <a class="nav-link" href="{{ route('purchase_returns.index') }}">Returns</a>
                             </li>
                             @endcan
                         </ul>

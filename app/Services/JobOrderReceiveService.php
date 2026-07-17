@@ -22,11 +22,18 @@ class JobOrderReceiveService
 
             $jobOrder = JobOrder::with('jobType')->findOrFail($data['job_order_id']);
 
+            // Calculated total from item lines (rate × output qty per line),
+            // unless the user provided a manual override.
+            $calculatedTotal = $this->calculateTotalProcessingAmount($items);
+            $processingCharge = isset($data['processing_charge_override']) && $data['processing_charge_override'] !== null
+                ? (float) $data['processing_charge_override']
+                : $calculatedTotal;
+
             $receive = JobOrderReceive::create([
                 'receive_no'        => $this->generateReceiveNo(),
                 'job_order_id'      => $jobOrder->id,
                 'receive_date'      => $data['receive_date'],
-                'processing_charge' => $data['processing_charge'] ?? 0,
+                'processing_charge' => $processingCharge,
                 'remarks'           => $data['remarks'] ?? null,
                 'attachments'       => $data['attachments'] ?? null,
                 'created_by'        => $userId,
@@ -41,7 +48,7 @@ class JobOrderReceiveService
 
             $this->refreshJobOrderStatus($jobOrder);
 
-            if ((float) $receive->processing_charge > 0) {
+            if ($receive->processing_charge > 0) {
                 $this->postVoucher($receive, $jobOrder, $userId);
             }
 
@@ -55,7 +62,6 @@ class JobOrderReceiveService
 
             $jobOrder = $receive->jobOrder()->with('jobType')->first();
 
-            // Reverse everything this receive previously created
             VendorStockLedger::where('reference_type', 'JobOrderReceive')
                 ->where('reference_id', $receive->id)
                 ->delete();
@@ -68,10 +74,14 @@ class JobOrderReceiveService
 
             $receive->items()->delete();
 
-            // Update header fields
+            $calculatedTotal = $this->calculateTotalProcessingAmount($items);
+            $processingCharge = isset($data['processing_charge_override']) && $data['processing_charge_override'] !== null
+                ? (float) $data['processing_charge_override']
+                : $calculatedTotal;
+
             $receive->update([
                 'receive_date'       => $data['receive_date'],
-                'processing_charge'  => $data['processing_charge'] ?? 0,
+                'processing_charge'  => $processingCharge,
                 'remarks'            => $data['remarks'] ?? null,
                 'attachments'        => $data['attachments'] ?? $receive->attachments,
                 'updated_by'         => $userId,
@@ -85,7 +95,7 @@ class JobOrderReceiveService
 
             $this->refreshJobOrderStatus($jobOrder);
 
-            if ((float) $receive->processing_charge > 0) {
+            if ($receive->processing_charge > 0) {
                 $this->postVoucher($receive, $jobOrder, $userId);
             }
 
@@ -117,10 +127,23 @@ class JobOrderReceiveService
         });
     }
 
-    // Combine rows that target the same raw_product_id into a single
-    // line with a summed quantity_consumed and a list of outputs.
-    // Prevents double-subtracting "still issued" when the form submits
-    // multiple rows for one raw product (e.g. split into two outputs).
+    // Sum of (conversion_rate × quantity_output) across all submitted lines.
+    // Rate basis = OUTPUT quantity (standard job-work billing: charged per
+    // unit of what the vendor delivers, e.g. Rs./meter of Greige woven).
+    private function calculateTotalProcessingAmount(array $items): float
+    {
+        $total = 0;
+        foreach ($items as $item) {
+            $rate = (float) ($item['conversion_rate'] ?? 0);
+            $qty  = (float) ($item['quantity_output'] ?? 0);
+            $total += $rate * $qty;
+        }
+        return round($total, 2);
+    }
+
+    // Combine rows targeting the same raw_product_id into one line —
+    // prevents double-subtracting "still issued" when the form submits
+    // multiple rows for one raw product.
     private function mergeItemsByRawProduct(array $items): array
     {
         $merged = [];
@@ -132,16 +155,20 @@ class JobOrderReceiveService
                 $merged[$key] = [
                     'raw_product_id'    => $item['raw_product_id'],
                     'quantity_consumed' => 0,
-                    'outputs'           => [],
+                    'outputs'           => [], // [output_product_id, quantity_output, conversion_rate, processing_amount]
                 ];
             }
 
             $merged[$key]['quantity_consumed'] += (float) ($item['quantity_consumed'] ?? 0);
 
             if (!empty($item['output_product_id']) && (float) ($item['quantity_output'] ?? 0) > 0) {
+                $rate   = (float) ($item['conversion_rate'] ?? 0);
+                $qty    = (float) $item['quantity_output'];
                 $merged[$key]['outputs'][] = [
                     'output_product_id' => $item['output_product_id'],
-                    'quantity_output'   => (float) $item['quantity_output'],
+                    'quantity_output'   => $qty,
+                    'conversion_rate'   => $rate,
+                    'processing_amount' => round($rate * $qty, 2),
                 ];
             }
         }
@@ -179,12 +206,9 @@ class JobOrderReceiveService
 
         $leftover = round($stillIssued - $consumed, 3);
 
-        // One JobOrderReceiveItem row per output (or one row with no
-        // output if none was specified), all sharing the same
-        // consumed/leftover figures for this raw product. Only the
-        // first row carries the consumed/leftover values, to avoid
-        // double-counting them across multiple output rows in reports.
-        $outputs = !empty($line['outputs']) ? $line['outputs'] : [['output_product_id' => null, 'quantity_output' => 0]];
+        $outputs = !empty($line['outputs'])
+            ? $line['outputs']
+            : [['output_product_id' => null, 'quantity_output' => 0, 'conversion_rate' => 0, 'processing_amount' => 0]];
 
         foreach ($outputs as $i => $output) {
             JobOrderReceiveItem::create([
@@ -194,6 +218,8 @@ class JobOrderReceiveService
                 'quantity_leftover'    => $i === 0 ? $leftover : 0,
                 'output_product_id'    => $output['output_product_id'],
                 'quantity_output'      => $output['quantity_output'],
+                'conversion_rate'      => $output['conversion_rate'],
+                'processing_amount'    => $output['processing_amount'],
             ]);
 
             if (!empty($output['output_product_id']) && $output['quantity_output'] > 0) {
@@ -201,7 +227,7 @@ class JobOrderReceiveService
                     'product_id'      => $output['output_product_id'],
                     'movement_type'   => 'JobReceiveOutput',
                     'quantity'        => $output['quantity_output'],
-                    'amount'          => 0,
+                    'amount'          => $output['processing_amount'], // value of the conversion, for costing
                     'reference_type'  => 'JobOrderReceive',
                     'reference_id'    => $receive->id,
                     'movement_date'   => $receive->receive_date,
@@ -209,8 +235,6 @@ class JobOrderReceiveService
             }
         }
 
-        // Remove the full 'stillIssued' amount from Issued — it's all
-        // being accounted for now, either consumed or moved to Leftover.
         VendorStockLedger::create([
             'vendor_id'      => $vendorId,
             'product_id'     => $rawProductId,
@@ -222,8 +246,6 @@ class JobOrderReceiveService
             'created_by'     => $receive->created_by,
         ]);
 
-        // Whatever wasn't consumed becomes Leftover, sitting at the
-        // vendor, available for a future Job Order.
         if ($leftover > 0) {
             VendorStockLedger::create([
                 'vendor_id'      => $vendorId,
@@ -238,8 +260,6 @@ class JobOrderReceiveService
         }
     }
 
-    // If nothing remains Issued for this job order across all its raw
-    // products, it's fully Received. Otherwise PartiallyReceived.
     private function refreshJobOrderStatus(JobOrder $jobOrder): void
     {
         $remainingIssued = VendorStockLedger::where('vendor_id', $jobOrder->vendor_id)
@@ -257,9 +277,7 @@ class JobOrderReceiveService
         $jobOrder->update(['status' => $status]);
     }
 
-    // Dr Processing/Service Cost (resolved from the job's job_type,
-    // falling back to the global 'processing_charges' mapping)
-    // / Cr Accounts Payable, tagged to vendor
+    // Dr Processing/Service Cost (resolved from job type) / Cr Accounts Payable
     private function postVoucher(JobOrderReceive $receive, JobOrder $jobOrder, ?int $userId): void
     {
         $processingAccountId = $jobOrder->jobType?->service_cost_account_id

@@ -22,7 +22,8 @@ return new class extends Migration
             // with no output, e.g. sampling loss)
             $table->unsignedBigInteger('output_product_id')->nullable();
             $table->decimal('quantity_output', 15, 3)->default(0);
-
+            $table->decimal('conversion_rate', 15, 2)->default(0);
+            $table->decimal('processing_amount', 15, 2)->default(0);
             $table->timestamps();
 
             $table->foreign('job_order_receive_id')->references('id')->on('job_order_receives')->onDelete('cascade');

@@ -43,12 +43,6 @@
             </div>
 
             <div class="col-md-3 mb-3">
-              <label>Processing Charge</label>
-              <input type="number" name="processing_charge" class="form-control" step="any" min="0" value="0">
-              <small class="text-muted">Vendor's labour fee — posts as an accounts payable.</small>
-            </div>
-
-            <div class="col-md-2 mb-3">
               <label>Attachments</label>
               <input type="file" name="attachments[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.zip">
             </div>
@@ -70,17 +64,34 @@
                   <th>Raw Product</th>
                   <th>Outstanding</th>
                   <th>Qty Consumed</th>
-                  <th>Leftover (auto)</th>
+                  <th>Leftover</th>
                   <th>Output Product</th>
-                  <th>Output Quantity</th>
+                  <th>Output Qty</th>
+                  <th>Rate / Unit</th>
+                  <th>Amount</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="itemsBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="7" class="text-end fw-bold">Calculated Total:</td>
+                  <td class="fw-bold" id="calcTotal">0.00</td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
             <button type="button" class="btn btn-outline-primary" id="addRowBtn">
               <i class="fas fa-plus"></i> Add Another Item
             </button>
+          </div>
+
+          <div class="row mt-3">
+            <div class="col-md-4">
+              <label>Processing Charge Override (optional)</label>
+              <input type="number" name="processing_charge_override" id="chargeOverride" class="form-control" step="any" min="0" placeholder="Leave blank to use calculated total">
+              <small class="text-muted">Only fill this if the vendor's actual invoice differs from the calculated amount above.</small>
+            </div>
           </div>
         </div>
 
@@ -94,7 +105,7 @@
 
 <script>
   const outputProducts = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name]));
-  let outstandingItems = []; // current job order's outstanding raw products
+  let outstandingItems = [];
   let rowIndex = 0;
 
   $(document).ready(function () {
@@ -105,6 +116,7 @@
     const jobId = $(this).val();
     $('#itemsBody').empty();
     rowIndex = 0;
+    recalcTotal();
 
     if (!jobId) {
       $('#itemsSection').hide();
@@ -128,9 +140,6 @@
         $('#loadingMsg').hide();
         $('#itemsSection').show();
 
-        // Pre-add one row per outstanding product, same as before,
-        // but now the row itself is a normal free-form row (product
-        // is selectable/changeable, and more rows can be added).
         data.forEach(item => addRow(item.product_id, item.outstanding));
       });
   });
@@ -177,8 +186,12 @@
           </select>
         </td>
         <td>
-          <input type="number" name="items[${idx}][quantity_output]" class="form-control" value="0" step="any" min="0">
+          <input type="number" name="items[${idx}][quantity_output]" class="form-control output-qty-input" value="0" step="any" min="0">
         </td>
+        <td>
+          <input type="number" name="items[${idx}][conversion_rate]" class="form-control rate-input" value="0" step="any" min="0">
+        </td>
+        <td class="line-amount-cell text-end">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
       </tr>
     `);
@@ -208,9 +221,30 @@
     $(this).closest('tr').find('.leftover-cell').text(leftover.toFixed(3));
   });
 
+  $(document).on('input', '.output-qty-input, .rate-input', function () {
+    recalcLine($(this).closest('tr'));
+  });
+
+  function recalcLine(row) {
+    const outputQty = parseFloat(row.find('.output-qty-input').val()) || 0;
+    const rate = parseFloat(row.find('.rate-input').val()) || 0;
+    const amount = outputQty * rate;
+    row.find('.line-amount-cell').text(amount.toFixed(2));
+    recalcTotal();
+  }
+
+  function recalcTotal() {
+    let total = 0;
+    $('.item-row').each(function () {
+      total += parseFloat($(this).find('.line-amount-cell').text()) || 0;
+    });
+    $('#calcTotal').text(total.toFixed(2));
+  }
+
   $(document).on('click', '.remove-row', function () {
     if ($('.item-row').length > 1) {
       $(this).closest('tr').remove();
+      recalcTotal();
     }
   });
 </script>

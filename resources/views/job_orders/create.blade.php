@@ -128,15 +128,32 @@
     checkStock($(this).closest('.item-row'));
   });
 
+  function productOptionsHtml() {
+    let html = '<option value="">Select Product</option>';
+    @foreach ($products as $product)
+      html += `<option value="{{ $product->id }}">{{ $product->name }} ({{ $product->sku }})</option>`;
+    @endforeach
+    return html;
+  }
+
   $('#add-row').on('click', function () {
-    const row = $('.item-row').first().clone();
-    row.find('select, input').val('');
-    row.find('.available-stock').text('—');
-    row.find('select[name^="items"]').attr('name', `items[${itemIndex}][product_id]`);
-    row.find('input[name^="items"]').attr('name', `items[${itemIndex}][quantity]`);
+    const idx = itemIndex++;
+
+    const row = $(`
+      <tr class="item-row">
+        <td>
+          <select name="items[${idx}][product_id]" class="form-control select2-js product-select">
+            ${productOptionsHtml()}
+          </select>
+        </td>
+        <td class="available-stock text-muted">—</td>
+        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input" step="any" min="0.001"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
+      </tr>
+    `);
+
     $('#itemsBody').append(row);
     row.find('.select2-js').select2({ width: '100%' });
-    itemIndex++;
   });
 
   $(document).on('click', '.remove-row', function () {
