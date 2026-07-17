@@ -16,19 +16,10 @@ return new class extends Migration
             $table->unsignedBigInteger('raw_product_id');
             $table->decimal('quantity_consumed', 15, 3);
             $table->decimal('quantity_leftover', 15, 3)->default(0); // computed: issued - consumed
-
-            // The finished/output product returned to our own warehouse
-            // (nullable — a receive line can be pure raw-consumption tracking
-            // with no output, e.g. sampling loss)
-            $table->unsignedBigInteger('output_product_id')->nullable();
-            $table->decimal('quantity_output', 15, 3)->default(0);
-            $table->decimal('conversion_rate', 15, 2)->default(0);
-            $table->decimal('processing_amount', 15, 2)->default(0);
             $table->timestamps();
 
             $table->foreign('job_order_receive_id')->references('id')->on('job_order_receives')->onDelete('cascade');
             $table->foreign('raw_product_id')->references('id')->on('products')->onDelete('cascade');
-            $table->foreign('output_product_id')->references('id')->on('products')->onDelete('set null');
         });
     }
 

@@ -61,66 +61,89 @@
             </div>
           </div>
 
+          {{-- ── RAW MATERIALS CONSUMED ────────────────────────────── --}}
+          <h5 class="mt-3">Raw Materials Consumed</h5>
           <div class="table-responsive mb-3">
-            <table class="table table-bordered" id="itemsTable">
+            <table class="table table-bordered" id="consumedTable">
               <thead>
                 <tr>
                   <th>Raw Product</th>
                   <th>Qty Consumed</th>
-                  <th>Output Product</th>
-                  <th>Output Qty</th>
-                  <th>Rate / Unit</th>
-                  <th>Amount</th>
                   <th></th>
                 </tr>
               </thead>
-              <tbody id="itemsBody">
+              <tbody id="consumedBody">
                 @foreach($receive->items as $i => $item)
-                <tr class="item-row">
+                <tr class="consumed-row">
                   <td>
-                    <select name="items[{{ $i }}][raw_product_id]" class="form-control select2-js" required>
+                    <select name="consumed[{{ $i }}][raw_product_id]" class="form-control select2-js" required>
                       <option value="">Select Product</option>
                       @foreach ($products as $p)
                         <option value="{{ $p->id }}" @selected($p->id == $item->raw_product_id)>{{ $p->name }} ({{ $p->sku }})</option>
                       @endforeach
                     </select>
                   </td>
-                  <td><input type="number" name="items[{{ $i }}][quantity_consumed]" class="form-control" step="any" min="0" value="{{ $item->quantity_consumed }}"></td>
+                  <td><input type="number" name="consumed[{{ $i }}][quantity_consumed]" class="form-control" step="any" min="0" value="{{ $item->quantity_consumed }}"></td>
+                  <td><button type="button" class="btn btn-sm btn-outline-danger remove-consumed-row">&times;</button></td>
+                </tr>
+                @endforeach
+              </tbody>
+            </table>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="addConsumedRowBtn">
+              <i class="fas fa-plus"></i> Add Raw Product
+            </button>
+          </div>
+
+          {{-- ── OUTPUTS PRODUCED ──────────────────────────────────── --}}
+          <h5 class="mt-4">Output(s) Produced</h5>
+          <div class="table-responsive mb-3">
+            <table class="table table-bordered" id="outputsTable">
+              <thead>
+                <tr>
+                  <th>Output Product</th>
+                  <th>Quantity</th>
+                  <th>Rate / Unit</th>
+                  <th>Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="outputsBody">
+                @foreach($receive->outputs as $i => $output)
+                <tr class="output-row">
                   <td>
-                    <select name="items[{{ $i }}][output_product_id]" class="form-control select2-js">
-                      <option value="">— None —</option>
+                    <select name="outputs[{{ $i }}][output_product_id]" class="form-control select2-js" required>
+                      <option value="">Select Product</option>
                       @foreach ($products as $p)
-                        <option value="{{ $p->id }}" @selected($p->id == $item->output_product_id)>{{ $p->name }} ({{ $p->sku }})</option>
+                        <option value="{{ $p->id }}" @selected($p->id == $output->output_product_id)>{{ $p->name }} ({{ $p->sku }})</option>
                       @endforeach
                     </select>
                   </td>
-                  <td><input type="number" name="items[{{ $i }}][quantity_output]" class="form-control output-qty-input" step="any" min="0" value="{{ $item->quantity_output }}"></td>
-                  <td><input type="number" name="items[{{ $i }}][conversion_rate]" class="form-control rate-input" step="any" min="0" value="{{ $item->conversion_rate }}"></td>
-                  <td class="line-amount-cell text-end">{{ number_format($item->processing_amount, 2) }}</td>
-                  <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
+                  <td><input type="number" name="outputs[{{ $i }}][quantity_output]" class="form-control output-qty-input" step="any" min="0" value="{{ $output->quantity_output }}"></td>
+                  <td><input type="number" name="outputs[{{ $i }}][conversion_rate]" class="form-control rate-input" step="any" min="0" value="{{ $output->conversion_rate }}"></td>
+                  <td class="line-amount-cell text-end">{{ number_format($output->processing_amount, 2) }}</td>
+                  <td><button type="button" class="btn btn-sm btn-outline-danger remove-output-row">&times;</button></td>
                 </tr>
                 @endforeach
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="5" class="text-end fw-bold">Calculated Total:</td>
-                  <td class="fw-bold" id="calcTotal">{{ number_format($receive->items->sum('processing_amount'), 2) }}</td>
+                  <td colspan="3" class="text-end fw-bold">Calculated Total:</td>
+                  <td class="fw-bold" id="calcTotal">{{ number_format($receive->outputs->sum('processing_amount'), 2) }}</td>
                   <td></td>
                 </tr>
               </tfoot>
             </table>
-            <button type="button" class="btn btn-outline-primary" id="addRowBtn">
-              <i class="fas fa-plus"></i> Add Item
+            <button type="button" class="btn btn-outline-primary" id="addOutputRowBtn">
+              <i class="fas fa-plus"></i> Add Output Product
             </button>
           </div>
 
           <div class="row mt-3">
             <div class="col-md-4">
               <label>Processing Charge Override (optional)</label>
-              <input type="number" name="processing_charge_override" id="chargeOverride" class="form-control" step="any" min="0"
-                     value="{{ $receive->processing_charge != $receive->items->sum('processing_amount') ? $receive->processing_charge : '' }}"
+              <input type="number" name="processing_charge_override" class="form-control" step="any" min="0"
+                     value="{{ $receive->processing_charge != $receive->outputs->sum('processing_amount') ? $receive->processing_charge : '' }}"
                      placeholder="Leave blank to use calculated total">
-              <small class="text-muted">Only fill this if the vendor's actual invoice differs from the calculated amount above.</small>
             </div>
           </div>
         </div>
@@ -134,21 +157,14 @@
 </div>
 
 <script>
-  let rowIndex = {{ $receive->items->count() }};
+  let consumedIndex = {{ $receive->items->count() }};
+  let outputIndex   = {{ $receive->outputs->count() }};
 
   $(document).ready(function () {
     $('.select2-js').select2({ width: '100%' });
   });
 
-  function outputProductOptionsHtml() {
-    let html = '<option value="">— None —</option>';
-    @foreach ($products as $p)
-      html += `<option value="{{ $p->id }}">{{ $p->name }} ({{ $p->sku }})</option>`;
-    @endforeach
-    return html;
-  }
-
-  function rawProductOptionsHtml() {
+  function productOptionsHtml() {
     let html = '<option value="">Select Product</option>';
     @foreach ($products as $p)
       html += `<option value="{{ $p->id }}">{{ $p->name }} ({{ $p->sku }})</option>`;
@@ -156,53 +172,66 @@
     return html;
   }
 
-  $('#addRowBtn').on('click', function () {
-    const idx = rowIndex++;
+  $('#addConsumedRowBtn').on('click', function () {
+    const idx = consumedIndex++;
     const row = $(`
-      <tr class="item-row">
+      <tr class="consumed-row">
         <td>
-          <select name="items[${idx}][raw_product_id]" class="form-control select2-js" required>
-            ${rawProductOptionsHtml()}
+          <select name="consumed[${idx}][raw_product_id]" class="form-control select2-js" required>
+            ${productOptionsHtml()}
           </select>
         </td>
-        <td><input type="number" name="items[${idx}][quantity_consumed]" class="form-control" step="any" min="0" value="0"></td>
-        <td>
-          <select name="items[${idx}][output_product_id]" class="form-control select2-js">
-            ${outputProductOptionsHtml()}
-          </select>
-        </td>
-        <td><input type="number" name="items[${idx}][quantity_output]" class="form-control output-qty-input" step="any" min="0" value="0"></td>
-        <td><input type="number" name="items[${idx}][conversion_rate]" class="form-control rate-input" step="any" min="0" value="0"></td>
-        <td class="line-amount-cell text-end">0.00</td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
+        <td><input type="number" name="consumed[${idx}][quantity_consumed]" class="form-control" step="any" min="0" value="0"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-consumed-row">&times;</button></td>
       </tr>
     `);
-    $('#itemsBody').append(row);
+    $('#consumedBody').append(row);
+    row.find('.select2-js').select2({ width: '100%' });
+  });
+
+  $(document).on('click', '.remove-consumed-row', function () {
+    if ($('.consumed-row').length > 1) {
+      $(this).closest('tr').remove();
+    }
+  });
+
+  $('#addOutputRowBtn').on('click', function () {
+    const idx = outputIndex++;
+    const row = $(`
+      <tr class="output-row">
+        <td>
+          <select name="outputs[${idx}][output_product_id]" class="form-control select2-js" required>
+            ${productOptionsHtml()}
+          </select>
+        </td>
+        <td><input type="number" name="outputs[${idx}][quantity_output]" class="form-control output-qty-input" step="any" min="0" value="0"></td>
+        <td><input type="number" name="outputs[${idx}][conversion_rate]" class="form-control rate-input" step="any" min="0" value="0"></td>
+        <td class="line-amount-cell text-end">0.00</td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-output-row">&times;</button></td>
+      </tr>
+    `);
+    $('#outputsBody').append(row);
     row.find('.select2-js').select2({ width: '100%' });
   });
 
   $(document).on('input', '.output-qty-input, .rate-input', function () {
-    recalcLine($(this).closest('tr'));
-  });
-
-  function recalcLine(row) {
-    const outputQty = parseFloat(row.find('.output-qty-input').val()) || 0;
+    const row = $(this).closest('tr');
+    const qty = parseFloat(row.find('.output-qty-input').val()) || 0;
     const rate = parseFloat(row.find('.rate-input').val()) || 0;
-    const amount = outputQty * rate;
-    row.find('.line-amount-cell').text(amount.toFixed(2));
+    row.find('.line-amount-cell').text((qty * rate).toFixed(2));
     recalcTotal();
-  }
+  });
 
   function recalcTotal() {
     let total = 0;
-    $('.item-row').each(function () {
+    $('.output-row').each(function () {
       total += parseFloat($(this).find('.line-amount-cell').text()) || 0;
     });
     $('#calcTotal').text(total.toFixed(2));
   }
 
-  $(document).on('click', '.remove-row', function () {
-    if ($('.item-row').length > 1) {
+  $(document).on('click', '.remove-output-row', function () {
+    if ($('.output-row').length > 1) {
       $(this).closest('tr').remove();
       recalcTotal();
     }

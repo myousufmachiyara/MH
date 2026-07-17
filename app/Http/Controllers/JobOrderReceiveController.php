@@ -80,26 +80,27 @@ class JobOrderReceiveController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'job_order_id'                       => 'required|exists:job_orders,id',
-            'receive_date'                        => 'required|date',
-            'processing_charge_override'          => 'nullable|numeric|min:0',
-            'remarks'                             => 'nullable|string',
-            'items'                                => 'required|array|min:1',
-            'items.*.raw_product_id'              => 'required|integer|exists:products,id',
-            'items.*.quantity_consumed'           => 'required|numeric|min:0',
-            'items.*.output_product_id'           => 'nullable|integer|exists:products,id',
-            'items.*.quantity_output'             => 'nullable|numeric|min:0',
-            'items.*.conversion_rate'             => 'nullable|numeric|min:0',
+            'job_order_id'                         => 'required|exists:job_orders,id',
+            'receive_date'                          => 'required|date',
+            'processing_charge_override'            => 'nullable|numeric|min:0',
+            'remarks'                               => 'nullable|string',
+            'consumed'                               => 'required|array|min:1',
+            'consumed.*.raw_product_id'             => 'required|integer|exists:products,id',
+            'consumed.*.quantity_consumed'          => 'required|numeric|min:0',
+            'outputs'                                => 'required|array|min:1',
+            'outputs.*.output_product_id'           => 'required|integer|exists:products,id',
+            'outputs.*.quantity_output'             => 'required|numeric|min:0',
+            'outputs.*.conversion_rate'             => 'nullable|numeric|min:0',
         ]);
 
-        $items = array_values($validated['items']);
-        $items = array_values(array_filter($items, function ($item) {
-            return !empty($item['raw_product_id'])
-                && ((float) ($item['quantity_consumed'] ?? 0) > 0 || (float) ($item['quantity_output'] ?? 0) > 0);
-        }));
+        $consumed = array_values(array_filter($validated['consumed'], fn($i) => !empty($i['raw_product_id']) && (float) ($i['quantity_consumed'] ?? 0) > 0));
+        $outputs  = array_values(array_filter($validated['outputs'], fn($i) => !empty($i['output_product_id']) && (float) ($i['quantity_output'] ?? 0) > 0));
 
-        if (empty($items)) {
-            return back()->withInput()->with('error', 'Enter at least one item with a quantity consumed or output.');
+        if (empty($consumed)) {
+            return back()->withInput()->with('error', 'Enter at least one raw material consumed.');
+        }
+        if (empty($outputs)) {
+            return back()->withInput()->with('error', 'Enter at least one output product received.');
         }
 
         try {
@@ -116,15 +117,15 @@ class JobOrderReceiveController extends Controller
                 'processing_charge_override'  => $validated['processing_charge_override'] ?? null,
                 'remarks'                     => $validated['remarks'] ?? null,
                 'attachments'                 => $attachments ?: null,
-            ], $items, auth()->id());
+            ], $consumed, $outputs, auth()->id());
 
-            Log::info('[JobOrderReceive] Created', ['id' => $receive->id, 'items_count' => count($items), 'by' => auth()->id()]);
+            Log::info('[JobOrderReceive] Created', ['id' => $receive->id, 'by' => auth()->id()]);
 
             return redirect()->route('job_receives.index')
                 ->with('success', 'Job receive ' . $receive->receive_no . ' recorded successfully.');
 
         } catch (\Exception $e) {
-            Log::error('[JobOrderReceive] Store failed', ['message' => $e->getMessage(), 'items' => $items]);
+            Log::error('[JobOrderReceive] Store failed', ['message' => $e->getMessage()]);
             return back()->withInput()->with('error', $e->getMessage());
         }
     }
@@ -132,24 +133,23 @@ class JobOrderReceiveController extends Controller
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
-            'receive_date'                        => 'required|date',
-            'processing_charge_override'          => 'nullable|numeric|min:0',
-            'remarks'                             => 'nullable|string',
-            'items'                                => 'required|array|min:1',
-            'items.*.raw_product_id'              => 'required|integer|exists:products,id',
-            'items.*.quantity_consumed'           => 'required|numeric|min:0',
-            'items.*.output_product_id'           => 'nullable|integer|exists:products,id',
-            'items.*.quantity_output'             => 'nullable|numeric|min:0',
-            'items.*.conversion_rate'             => 'nullable|numeric|min:0',
+            'receive_date'                          => 'required|date',
+            'processing_charge_override'            => 'nullable|numeric|min:0',
+            'remarks'                               => 'nullable|string',
+            'consumed'                               => 'required|array|min:1',
+            'consumed.*.raw_product_id'             => 'required|integer|exists:products,id',
+            'consumed.*.quantity_consumed'          => 'required|numeric|min:0',
+            'outputs'                                => 'required|array|min:1',
+            'outputs.*.output_product_id'           => 'required|integer|exists:products,id',
+            'outputs.*.quantity_output'             => 'required|numeric|min:0',
+            'outputs.*.conversion_rate'             => 'nullable|numeric|min:0',
         ]);
 
-        $items = array_values(array_filter($validated['items'], function ($item) {
-            return !empty($item['raw_product_id'])
-                && ((float) ($item['quantity_consumed'] ?? 0) > 0 || (float) ($item['quantity_output'] ?? 0) > 0);
-        }));
+        $consumed = array_values(array_filter($validated['consumed'], fn($i) => !empty($i['raw_product_id']) && (float) ($i['quantity_consumed'] ?? 0) > 0));
+        $outputs  = array_values(array_filter($validated['outputs'], fn($i) => !empty($i['output_product_id']) && (float) ($i['quantity_output'] ?? 0) > 0));
 
-        if (empty($items)) {
-            return back()->withInput()->with('error', 'Enter at least one item.');
+        if (empty($consumed) || empty($outputs)) {
+            return back()->withInput()->with('error', 'Enter at least one raw material and one output.');
         }
 
         try {
@@ -167,7 +167,7 @@ class JobOrderReceiveController extends Controller
                 'processing_charge_override' => $validated['processing_charge_override'] ?? null,
                 'remarks'                    => $validated['remarks'] ?? null,
                 'attachments'                => $attachments ?: null,
-            ], $items, auth()->id());
+            ], $consumed, $outputs, auth()->id());
 
             Log::info('[JobOrderReceive] Updated', ['id' => $id, 'by' => auth()->id()]);
 
@@ -179,12 +179,10 @@ class JobOrderReceiveController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
     }
-    
+
     public function edit($id)
     {
-        $receive = JobOrderReceive::with('items.rawProduct', 'items.outputProduct', 'jobOrder.vendor')
-            ->findOrFail($id);
-
+        $receive = JobOrderReceive::with('items', 'outputs.outputProduct', 'jobOrder.vendor')->findOrFail($id);
         $products = Product::active()->orderBy('name')->get();
 
         return view('job_receives.edit', compact('receive', 'products'));

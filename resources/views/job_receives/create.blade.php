@@ -57,42 +57,61 @@
             Select a job order to see outstanding raw material.
           </div>
 
-          <div class="table-responsive mb-3" id="itemsSection" style="display:none">
-            <table class="table table-bordered" id="itemsTable">
-              <thead>
-                <tr>
-                  <th>Raw Product</th>
-                  <th>Outstanding</th>
-                  <th>Qty Consumed</th>
-                  <th>Leftover</th>
-                  <th>Output Product</th>
-                  <th>Output Qty</th>
-                  <th>Rate / Unit</th>
-                  <th>Amount</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="itemsBody"></tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="7" class="text-end fw-bold">Calculated Total:</td>
-                  <td class="fw-bold" id="calcTotal">0.00</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-            <button type="button" class="btn btn-outline-primary" id="addRowBtn">
-              <i class="fas fa-plus"></i> Add Another Item
-            </button>
-          </div>
-
-          <div class="row mt-3">
-            <div class="col-md-4">
-              <label>Processing Charge Override (optional)</label>
-              <input type="number" name="processing_charge_override" id="chargeOverride" class="form-control" step="any" min="0" placeholder="Leave blank to use calculated total">
-              <small class="text-muted">Only fill this if the vendor's actual invoice differs from the calculated amount above.</small>
+          {{-- ── RAW MATERIALS CONSUMED ────────────────────────────── --}}
+          <div id="consumedSection" style="display:none">
+            <h5 class="mt-3">Raw Materials Consumed</h5>
+            <div class="table-responsive mb-3">
+              <table class="table table-bordered" id="consumedTable">
+                <thead>
+                  <tr>
+                    <th>Raw Product</th>
+                    <th>Outstanding</th>
+                    <th>Qty Consumed</th>
+                    <th>Leftover</th>
+                  </tr>
+                </thead>
+                <tbody id="consumedBody"></tbody>
+              </table>
             </div>
           </div>
+
+          {{-- ── OUTPUTS PRODUCED ──────────────────────────────────── --}}
+          <div id="outputsSection" style="display:none">
+            <h5>Output(s) Produced</h5>
+            <div class="table-responsive mb-3">
+              <table class="table table-bordered" id="outputsTable">
+                <thead>
+                  <tr>
+                    <th>Output Product</th>
+                    <th>Quantity</th>
+                    <th>Rate / Unit</th>
+                    <th>Amount</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="outputsBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="3" class="text-end fw-bold">Calculated Total:</td>
+                    <td class="fw-bold" id="calcTotal">0.00</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+              <button type="button" class="btn btn-outline-primary" id="addOutputRowBtn">
+                <i class="fas fa-plus"></i> Add Output Product
+              </button>
+            </div>
+
+            <div class="row mt-3">
+              <div class="col-md-4">
+                <label>Processing Charge Override (optional)</label>
+                <input type="number" name="processing_charge_override" class="form-control" step="any" min="0" placeholder="Leave blank to use calculated total">
+                <small class="text-muted">Only fill this if the vendor's actual invoice differs from the calculated total.</small>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <footer class="card-footer text-end">
@@ -105,8 +124,8 @@
 
 <script>
   const outputProducts = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name]));
-  let outstandingItems = [];
-  let rowIndex = 0;
+  let consumedIndex = 0;
+  let outputIndex = 0;
 
   $(document).ready(function () {
     $('.select2-js').select2({ width: '100%' });
@@ -114,12 +133,14 @@
 
   $('#job_order_select').on('change', function () {
     const jobId = $(this).val();
-    $('#itemsBody').empty();
-    rowIndex = 0;
+    $('#consumedBody').empty();
+    $('#outputsBody').empty();
+    consumedIndex = 0;
+    outputIndex = 0;
     recalcTotal();
 
     if (!jobId) {
-      $('#itemsSection').hide();
+      $('#consumedSection, #outputsSection').hide();
       $('#loadingMsg').show().text('Select a job order to see outstanding raw material.');
       return;
     }
@@ -129,89 +150,71 @@
     fetch(`/job-receives/outstanding/${jobId}`)
       .then(res => res.json())
       .then(data => {
-        outstandingItems = data;
-
         if (data.length === 0) {
-          $('#itemsSection').hide();
+          $('#consumedSection, #outputsSection').hide();
           $('#loadingMsg').show().text('No outstanding raw material for this job order — it may already be fully received.');
           return;
         }
 
         $('#loadingMsg').hide();
-        $('#itemsSection').show();
+        $('#consumedSection, #outputsSection').show();
 
-        data.forEach(item => addRow(item.product_id, item.outstanding));
+        // Every outstanding raw product gets its own consumption row
+        data.forEach(item => addConsumedRow(item.product_id, item.product_name, item.outstanding));
+
+        // Start with one blank output row
+        addOutputRow();
       });
   });
 
-  function rawProductOptionsHtml(selectedId) {
-    let html = '<option value="">Select Product</option>';
-    outstandingItems.forEach(item => {
-      const sel = item.product_id == selectedId ? 'selected' : '';
-      html += `<option value="${item.product_id}" data-outstanding="${item.outstanding}" ${sel}>
-                 ${item.product_name} (outstanding: ${item.outstanding})
-               </option>`;
-    });
-    return html;
+  function addConsumedRow(productId, productName, outstanding) {
+    const idx = consumedIndex++;
+    const row = $(`
+      <tr>
+        <td>
+          ${productName}
+          <input type="hidden" name="consumed[${idx}][raw_product_id]" value="${productId}">
+        </td>
+        <td>${outstanding}</td>
+        <td>
+          <input type="number" name="consumed[${idx}][quantity_consumed]" class="form-control consumed-input"
+                 value="0" step="any" min="0" max="${outstanding}" data-outstanding="${outstanding}">
+        </td>
+        <td class="leftover-cell">${outstanding}</td>
+      </tr>
+    `);
+    $('#consumedBody').append(row);
   }
 
   function outputProductOptionsHtml() {
-    let html = '<option value="">— None —</option>';
+    let html = '<option value="">Select Product</option>';
     outputProducts.forEach(p => {
       html += `<option value="${p.id}">${p.name}</option>`;
     });
     return html;
   }
 
-  function addRow(preselectProductId = null, preselectOutstanding = null) {
-    const idx = rowIndex++;
-
+  function addOutputRow() {
+    const idx = outputIndex++;
     const row = $(`
-      <tr class="item-row">
+      <tr class="output-row">
         <td>
-          <select name="items[${idx}][raw_product_id]" class="form-control select2-js raw-product-select" required>
-            ${rawProductOptionsHtml(preselectProductId)}
-          </select>
-        </td>
-        <td class="outstanding-cell">${preselectOutstanding ?? '—'}</td>
-        <td>
-          <input type="number" name="items[${idx}][quantity_consumed]" class="form-control consumed-input"
-                 value="0" step="any" min="0" max="${preselectOutstanding ?? ''}"
-                 data-outstanding="${preselectOutstanding ?? 0}">
-        </td>
-        <td class="leftover-cell">${preselectOutstanding ?? 0}</td>
-        <td>
-          <select name="items[${idx}][output_product_id]" class="form-control select2-js">
+          <select name="outputs[${idx}][output_product_id]" class="form-control select2-js" required>
             ${outputProductOptionsHtml()}
           </select>
         </td>
-        <td>
-          <input type="number" name="items[${idx}][quantity_output]" class="form-control output-qty-input" value="0" step="any" min="0">
-        </td>
-        <td>
-          <input type="number" name="items[${idx}][conversion_rate]" class="form-control rate-input" value="0" step="any" min="0">
-        </td>
+        <td><input type="number" name="outputs[${idx}][quantity_output]" class="form-control output-qty-input" value="0" step="any" min="0"></td>
+        <td><input type="number" name="outputs[${idx}][conversion_rate]" class="form-control rate-input" value="0" step="any" min="0"></td>
         <td class="line-amount-cell text-end">0.00</td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-output-row">&times;</button></td>
       </tr>
     `);
-
-    $('#itemsBody').append(row);
+    $('#outputsBody').append(row);
     row.find('.select2-js').select2({ width: '100%' });
   }
 
-  $('#addRowBtn').on('click', function () {
-    addRow();
-  });
-
-  $(document).on('change', '.raw-product-select', function () {
-    const selected = $(this).find('option:selected');
-    const outstanding = parseFloat(selected.data('outstanding')) || 0;
-    const row = $(this).closest('tr');
-
-    row.find('.outstanding-cell').text(outstanding || '—');
-    row.find('.consumed-input').attr('max', outstanding).attr('data-outstanding', outstanding);
-    row.find('.leftover-cell').text(outstanding.toFixed(3));
+  $('#addOutputRowBtn').on('click', function () {
+    addOutputRow();
   });
 
   $(document).on('input', '.consumed-input', function () {
@@ -222,27 +225,23 @@
   });
 
   $(document).on('input', '.output-qty-input, .rate-input', function () {
-    recalcLine($(this).closest('tr'));
-  });
-
-  function recalcLine(row) {
-    const outputQty = parseFloat(row.find('.output-qty-input').val()) || 0;
+    const row = $(this).closest('tr');
+    const qty = parseFloat(row.find('.output-qty-input').val()) || 0;
     const rate = parseFloat(row.find('.rate-input').val()) || 0;
-    const amount = outputQty * rate;
-    row.find('.line-amount-cell').text(amount.toFixed(2));
+    row.find('.line-amount-cell').text((qty * rate).toFixed(2));
     recalcTotal();
-  }
+  });
 
   function recalcTotal() {
     let total = 0;
-    $('.item-row').each(function () {
+    $('.output-row').each(function () {
       total += parseFloat($(this).find('.line-amount-cell').text()) || 0;
     });
     $('#calcTotal').text(total.toFixed(2));
   }
 
-  $(document).on('click', '.remove-row', function () {
-    if ($('.item-row').length > 1) {
+  $(document).on('click', '.remove-output-row', function () {
+    if ($('.output-row').length > 1) {
       $(this).closest('tr').remove();
       recalcTotal();
     }

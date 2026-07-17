@@ -23,4 +23,5 @@ class JobOrderReceive extends Model
     ];
     public function jobOrder() { return $this->belongsTo(JobOrder::class, 'job_order_id'); }
     public function items()    { return $this->hasMany(JobOrderReceiveItem::class, 'job_order_receive_id'); }
+    public function outputs() { return $this->hasMany(JobOrderReceiveOutput::class, 'job_order_receive_id'); }
 }

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\JobOrder;
 use App\Models\JobOrderReceive;
 use App\Models\JobOrderReceiveItem;
+use App\Models\JobOrderReceiveOutput;
 use App\Models\VendorStockLedger;
 use App\Models\WarehouseStockMovement;
 use Illuminate\Support\Facades\DB;
@@ -16,15 +17,15 @@ class JobOrderReceiveService
         private AccountMappingService $mappingService
     ) {}
 
-    public function create(array $data, array $items, ?int $userId = null): JobOrderReceive
+    // $consumedItems: [ ['raw_product_id'=>.., 'quantity_consumed'=>..], ... ]
+    // $outputItems:   [ ['output_product_id'=>.., 'quantity_output'=>.., 'conversion_rate'=>..], ... ]
+    public function create(array $data, array $consumedItems, array $outputItems, ?int $userId = null): JobOrderReceive
     {
-        return DB::transaction(function () use ($data, $items, $userId) {
+        return DB::transaction(function () use ($data, $consumedItems, $outputItems, $userId) {
 
             $jobOrder = JobOrder::with('jobType')->findOrFail($data['job_order_id']);
 
-            // Calculated total from item lines (rate × output qty per line),
-            // unless the user provided a manual override.
-            $calculatedTotal = $this->calculateTotalProcessingAmount($items);
+            $calculatedTotal = $this->calculateTotalProcessingAmount($outputItems);
             $processingCharge = isset($data['processing_charge_override']) && $data['processing_charge_override'] !== null
                 ? (float) $data['processing_charge_override']
                 : $calculatedTotal;
@@ -40,10 +41,37 @@ class JobOrderReceiveService
                 'updated_by'        => $userId,
             ]);
 
-            $merged = $this->mergeItemsByRawProduct($items);
+            // Consume raw materials — merge duplicate rows for the same product first
+            $mergedConsumed = $this->mergeConsumedByProduct($consumedItems);
+            foreach ($mergedConsumed as $line) {
+                $this->consumeRawLine($jobOrder, $receive, $line);
+            }
 
-            foreach ($merged as $line) {
-                $this->processReceiveLine($jobOrder, $receive, $line);
+            // Record outputs — independent of raw lines, each priced separately
+            foreach ($outputItems as $output) {
+                $qty  = (float) $output['quantity_output'];
+                $rate = (float) ($output['conversion_rate'] ?? 0);
+                if ($qty <= 0) continue;
+
+                $amount = round($qty * $rate, 2);
+
+                JobOrderReceiveOutput::create([
+                    'job_order_receive_id' => $receive->id,
+                    'output_product_id'    => $output['output_product_id'],
+                    'quantity_output'      => $qty,
+                    'conversion_rate'      => $rate,
+                    'processing_amount'    => $amount,
+                ]);
+
+                WarehouseStockMovement::create([
+                    'product_id'      => $output['output_product_id'],
+                    'movement_type'   => 'JobReceiveOutput',
+                    'quantity'        => $qty,
+                    'amount'          => $amount,
+                    'reference_type'  => 'JobOrderReceive',
+                    'reference_id'    => $receive->id,
+                    'movement_date'   => $receive->receive_date,
+                ]);
             }
 
             $this->refreshJobOrderStatus($jobOrder);
@@ -52,13 +80,13 @@ class JobOrderReceiveService
                 $this->postVoucher($receive, $jobOrder, $userId);
             }
 
-            return $receive->load('items.rawProduct', 'items.outputProduct', 'jobOrder.vendor');
+            return $receive->load('items.rawProduct', 'outputs.outputProduct', 'jobOrder.vendor');
         });
     }
 
-    public function update(JobOrderReceive $receive, array $data, array $items, ?int $userId = null): JobOrderReceive
+    public function update(JobOrderReceive $receive, array $data, array $consumedItems, array $outputItems, ?int $userId = null): JobOrderReceive
     {
-        return DB::transaction(function () use ($receive, $data, $items, $userId) {
+        return DB::transaction(function () use ($receive, $data, $consumedItems, $outputItems, $userId) {
 
             $jobOrder = $receive->jobOrder()->with('jobType')->first();
 
@@ -73,8 +101,9 @@ class JobOrderReceiveService
             $this->voucherService->deleteByReference('JobOrderReceive', $receive->id);
 
             $receive->items()->delete();
+            $receive->outputs()->delete();
 
-            $calculatedTotal = $this->calculateTotalProcessingAmount($items);
+            $calculatedTotal = $this->calculateTotalProcessingAmount($outputItems);
             $processingCharge = isset($data['processing_charge_override']) && $data['processing_charge_override'] !== null
                 ? (float) $data['processing_charge_override']
                 : $calculatedTotal;
@@ -87,10 +116,35 @@ class JobOrderReceiveService
                 'updated_by'         => $userId,
             ]);
 
-            $merged = $this->mergeItemsByRawProduct($items);
+            $mergedConsumed = $this->mergeConsumedByProduct($consumedItems);
+            foreach ($mergedConsumed as $line) {
+                $this->consumeRawLine($jobOrder, $receive, $line);
+            }
 
-            foreach ($merged as $line) {
-                $this->processReceiveLine($jobOrder, $receive, $line);
+            foreach ($outputItems as $output) {
+                $qty  = (float) $output['quantity_output'];
+                $rate = (float) ($output['conversion_rate'] ?? 0);
+                if ($qty <= 0) continue;
+
+                $amount = round($qty * $rate, 2);
+
+                JobOrderReceiveOutput::create([
+                    'job_order_receive_id' => $receive->id,
+                    'output_product_id'    => $output['output_product_id'],
+                    'quantity_output'      => $qty,
+                    'conversion_rate'      => $rate,
+                    'processing_amount'    => $amount,
+                ]);
+
+                WarehouseStockMovement::create([
+                    'product_id'      => $output['output_product_id'],
+                    'movement_type'   => 'JobReceiveOutput',
+                    'quantity'        => $qty,
+                    'amount'          => $amount,
+                    'reference_type'  => 'JobOrderReceive',
+                    'reference_id'    => $receive->id,
+                    'movement_date'   => $receive->receive_date,
+                ]);
             }
 
             $this->refreshJobOrderStatus($jobOrder);
@@ -99,7 +153,7 @@ class JobOrderReceiveService
                 $this->postVoucher($receive, $jobOrder, $userId);
             }
 
-            return $receive->load('items.rawProduct', 'items.outputProduct', 'jobOrder.vendor');
+            return $receive->load('items.rawProduct', 'outputs.outputProduct', 'jobOrder.vendor');
         });
     }
 
@@ -119,6 +173,7 @@ class JobOrderReceiveService
             $this->voucherService->deleteByReference('JobOrderReceive', $receive->id);
 
             $receive->items()->delete();
+            $receive->outputs()->delete();
             $receive->delete();
 
             if ($jobOrder) {
@@ -127,56 +182,37 @@ class JobOrderReceiveService
         });
     }
 
-    // Sum of (conversion_rate × quantity_output) across all submitted lines.
-    // Rate basis = OUTPUT quantity (standard job-work billing: charged per
-    // unit of what the vendor delivers, e.g. Rs./meter of Greige woven).
-    private function calculateTotalProcessingAmount(array $items): float
+    private function calculateTotalProcessingAmount(array $outputItems): float
     {
         $total = 0;
-        foreach ($items as $item) {
-            $rate = (float) ($item['conversion_rate'] ?? 0);
-            $qty  = (float) ($item['quantity_output'] ?? 0);
-            $total += $rate * $qty;
+        foreach ($outputItems as $output) {
+            $qty  = (float) ($output['quantity_output'] ?? 0);
+            $rate = (float) ($output['conversion_rate'] ?? 0);
+            $total += $qty * $rate;
         }
         return round($total, 2);
     }
 
-    // Combine rows targeting the same raw_product_id into one line —
-    // prevents double-subtracting "still issued" when the form submits
-    // multiple rows for one raw product.
-    private function mergeItemsByRawProduct(array $items): array
+    // Combine multiple rows consuming the same raw product (e.g. if the
+    // form allowed picking a product twice by mistake) into one quantity.
+    private function mergeConsumedByProduct(array $items): array
     {
         $merged = [];
-
         foreach ($items as $item) {
             $key = $item['raw_product_id'];
-
-            if (!isset($merged[$key])) {
-                $merged[$key] = [
-                    'raw_product_id'    => $item['raw_product_id'],
-                    'quantity_consumed' => 0,
-                    'outputs'           => [], // [output_product_id, quantity_output, conversion_rate, processing_amount]
-                ];
-            }
-
-            $merged[$key]['quantity_consumed'] += (float) ($item['quantity_consumed'] ?? 0);
-
-            if (!empty($item['output_product_id']) && (float) ($item['quantity_output'] ?? 0) > 0) {
-                $rate   = (float) ($item['conversion_rate'] ?? 0);
-                $qty    = (float) $item['quantity_output'];
-                $merged[$key]['outputs'][] = [
-                    'output_product_id' => $item['output_product_id'],
-                    'quantity_output'   => $qty,
-                    'conversion_rate'   => $rate,
-                    'processing_amount' => round($rate * $qty, 2),
-                ];
-            }
+            $merged[$key] = ($merged[$key] ?? 0) + (float) ($item['quantity_consumed'] ?? 0);
         }
 
-        return array_values($merged);
+        $result = [];
+        foreach ($merged as $productId => $qty) {
+            if ($qty > 0) {
+                $result[] = ['raw_product_id' => $productId, 'quantity_consumed' => $qty];
+            }
+        }
+        return $result;
     }
 
-    private function processReceiveLine(JobOrder $jobOrder, JobOrderReceive $receive, array $line): void
+    private function consumeRawLine(JobOrder $jobOrder, JobOrderReceive $receive, array $line): void
     {
         $vendorId     = $jobOrder->vendor_id;
         $rawProductId = $line['raw_product_id'];
@@ -206,34 +242,12 @@ class JobOrderReceiveService
 
         $leftover = round($stillIssued - $consumed, 3);
 
-        $outputs = !empty($line['outputs'])
-            ? $line['outputs']
-            : [['output_product_id' => null, 'quantity_output' => 0, 'conversion_rate' => 0, 'processing_amount' => 0]];
-
-        foreach ($outputs as $i => $output) {
-            JobOrderReceiveItem::create([
-                'job_order_receive_id' => $receive->id,
-                'raw_product_id'       => $rawProductId,
-                'quantity_consumed'    => $i === 0 ? $consumed : 0,
-                'quantity_leftover'    => $i === 0 ? $leftover : 0,
-                'output_product_id'    => $output['output_product_id'],
-                'quantity_output'      => $output['quantity_output'],
-                'conversion_rate'      => $output['conversion_rate'],
-                'processing_amount'    => $output['processing_amount'],
-            ]);
-
-            if (!empty($output['output_product_id']) && $output['quantity_output'] > 0) {
-                WarehouseStockMovement::create([
-                    'product_id'      => $output['output_product_id'],
-                    'movement_type'   => 'JobReceiveOutput',
-                    'quantity'        => $output['quantity_output'],
-                    'amount'          => $output['processing_amount'], // value of the conversion, for costing
-                    'reference_type'  => 'JobOrderReceive',
-                    'reference_id'    => $receive->id,
-                    'movement_date'   => $receive->receive_date,
-                ]);
-            }
-        }
+        JobOrderReceiveItem::create([
+            'job_order_receive_id' => $receive->id,
+            'raw_product_id'       => $rawProductId,
+            'quantity_consumed'    => $consumed,
+            'quantity_leftover'    => $leftover,
+        ]);
 
         VendorStockLedger::create([
             'vendor_id'      => $vendorId,
@@ -277,7 +291,6 @@ class JobOrderReceiveService
         $jobOrder->update(['status' => $status]);
     }
 
-    // Dr Processing/Service Cost (resolved from job type) / Cr Accounts Payable
     private function postVoucher(JobOrderReceive $receive, JobOrder $jobOrder, ?int $userId): void
     {
         $processingAccountId = $jobOrder->jobType?->service_cost_account_id
