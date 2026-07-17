@@ -156,16 +156,6 @@
                     @endcan
                     --}}
 
-                    {{-- ── Gate Passes ────────────────────────────── --}}
-                    @can('gate_passes.index')
-                    <li class="{{ request()->routeIs('gate_passes.*') ? 'active' : '' }}">
-                        <a class="nav-link" href="{{ route('gate_passes.index') }}">
-                            <i class="fa fa-truck-loading" aria-hidden="true"></i>
-                            <span>Gate Passes</span>
-                        </a>
-                    </li>
-                    @endcan
-
                     {{-- ── Purchase (Invoice / Order / Return) ───── --}}
                     @if(auth()->user()->canAny(['purchase.index']))
                     <li class="nav-parent {{ request()->routeIs('purchase_invoices.*', 'purchase_orders.*', 'purchase_returns.*') ? 'nav-expanded active' : '' }}">
@@ -188,6 +178,16 @@
                         </ul>
                     </li>
                     @endif
+
+                    {{-- ── Gate Passes ────────────────────────────── --}}
+                    @can('gate_passes.index')
+                    <li class="{{ request()->routeIs('gate_passes.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('gate_passes.index') }}">
+                            <i class="fa fa-truck-loading" aria-hidden="true"></i>
+                            <span>Gate Passes</span>
+                        </a>
+                    </li>
+                    @endcan
 
                     {{-- ── Jobs + Job Receives + Job Types (mobile: Jobs / Receives tiles) ── --}}
                     @if(auth()->user()->canAny(['jobs.index', 'job_receives.index', 'job_types.index']))
@@ -215,6 +215,8 @@
                         </ul>
                     </li>
                     @endif
+
+                    
 
                     {{-- ── Sale (Order / Invoice / Return) ───────── --}}
                     {{-- NOT YET BUILT — SaleController is a placeholder only.
